@@ -16,7 +16,8 @@ const els = {
   form: document.querySelector("#chatForm"),
   input: document.querySelector("#chatInput"),
   mode: document.querySelector("#modePill"),
-  voice: document.querySelector("#voiceToggle")
+  voice: document.querySelector("#voiceToggle"),
+  providerList: document.querySelector("#providerList")
 };
 
 function escapeHtml(value) {
@@ -179,6 +180,24 @@ async function boot() {
   els.reply.textContent = plan.reply;
   els.reason.textContent = plan.reason;
   render();
+  loadProviderStatus();
+}
+
+async function loadProviderStatus() {
+  const response = await fetch("/api/config/status");
+  const { providers } = await response.json();
+  els.providerList.innerHTML = "";
+
+  for (const provider of providers) {
+    const item = document.createElement("article");
+    item.className = `provider-item ${provider.state}`;
+    item.innerHTML = `
+      <strong>${escapeHtml(provider.label)}</strong>
+      <span>${escapeHtml(provider.state)}</span>
+      <p>${escapeHtml(provider.reason || "已配置")}</p>
+    `;
+    els.providerList.appendChild(item);
+  }
 }
 
 boot().catch((error) => {

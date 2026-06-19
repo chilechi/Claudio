@@ -42,7 +42,16 @@ const config = {
   aiProvider: process.env.AI_PROVIDER || "local",
   deepseekApiKey: process.env.DEEPSEEK_API_KEY || "",
   deepseekModel: process.env.DEEPSEEK_MODEL || "deepseek-chat",
-  deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"
+  deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
+  localMusicDir: process.env.LOCAL_MUSIC_DIR || "",
+  neteasePlaylistId: process.env.NETEASE_PLAYLIST_ID || "",
+  neteaseCookie: process.env.NETEASE_COOKIE || "",
+  ttsProvider: process.env.TTS_PROVIDER || "",
+  asrProvider: process.env.ASR_PROVIDER || "",
+  openWeatherApiKey: process.env.OPENWEATHER_API_KEY || "",
+  weatherCity: process.env.WEATHER_CITY || "",
+  upnpEnabled: process.env.UPNP_ENABLED || "",
+  upnpDeviceName: process.env.UPNP_DEVICE_NAME || ""
 };
 
 function sendJson(response, status, data) {
@@ -81,6 +90,29 @@ async function loadState() {
 async function saveState(state) {
   state.updatedAt = new Date().toISOString();
   await writeJsonFile(join(dataDir, "state.json"), state);
+}
+
+function providerStatuses() {
+  return [
+    providerStatus("local-music", "本地音乐目录", Boolean(config.localMusicDir), "缺少 LOCAL_MUSIC_DIR"),
+    providerStatus("deepseek", "DeepSeek AI DJ", Boolean(config.deepseekApiKey), "缺少 DEEPSEEK_API_KEY"),
+    providerStatus("netease", "网易云歌单", Boolean(config.neteasePlaylistId), "缺少 NETEASE_PLAYLIST_ID"),
+    providerStatus("tts", "真实 TTS", Boolean(config.ttsProvider), "未选择 TTS_PROVIDER，当前只能使用浏览器语音回退", "fallback"),
+    providerStatus("asr", "语音输入", Boolean(config.asrProvider), "未选择 ASR_PROVIDER，当前只能使用浏览器能力", "fallback"),
+    providerStatus("weather", "天气", Boolean(config.openWeatherApiKey && config.weatherCity), "缺少 OPENWEATHER_API_KEY 或 WEATHER_CITY"),
+    providerStatus("calendar", "日历/日程", false, "尚未选择日历接入方式"),
+    providerStatus("upnp", "家庭音响/UPnP", config.upnpEnabled === "true" && Boolean(config.upnpDeviceName), "缺少 UPNP_ENABLED=true 或 UPNP_DEVICE_NAME")
+  ];
+}
+
+function providerStatus(id, label, configured, reason, fallbackState) {
+  return {
+    id,
+    label,
+    configured,
+    state: configured ? "ready" : fallbackState || "missing",
+    reason: configured ? undefined : reason
+  };
 }
 
 async function planWithAiOrLocal(input, library, state = {}) {
@@ -153,6 +185,11 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/library") {
       sendJson(response, 200, await loadLibrary());
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/config/status") {
+      sendJson(response, 200, { providers: providerStatuses() });
       return;
     }
 

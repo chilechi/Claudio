@@ -1,9 +1,11 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import { loadConfig, providerStatuses } from "./config.js";
 
 const server = Fastify({
   logger: true
 });
+const config = loadConfig();
 
 await server.register(cors, {
   origin: true
@@ -16,27 +18,10 @@ server.get("/api/health", async () => ({
 }));
 
 server.get("/api/config/status", async () => ({
-  providers: [
-    {
-      id: "local-music",
-      label: "本地音乐目录",
-      configured: Boolean(process.env.LOCAL_MUSIC_DIR),
-      state: process.env.LOCAL_MUSIC_DIR ? "ready" : "missing",
-      reason: process.env.LOCAL_MUSIC_DIR ? undefined : "缺少 LOCAL_MUSIC_DIR"
-    },
-    {
-      id: "deepseek",
-      label: "DeepSeek AI DJ",
-      configured: Boolean(process.env.DEEPSEEK_API_KEY),
-      state: process.env.DEEPSEEK_API_KEY ? "ready" : "missing",
-      reason: process.env.DEEPSEEK_API_KEY ? undefined : "缺少 DEEPSEEK_API_KEY"
-    }
-  ]
+  providers: providerStatuses(config)
 }));
-
-const port = Number(process.env.PORT || 8080);
 
 await server.listen({
   host: "127.0.0.1",
-  port
+  port: config.PORT
 });
