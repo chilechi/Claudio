@@ -17,7 +17,8 @@ const els = {
   input: document.querySelector("#chatInput"),
   mode: document.querySelector("#modePill"),
   voice: document.querySelector("#voiceToggle"),
-  providerList: document.querySelector("#providerList")
+  providerList: document.querySelector("#providerList"),
+  audio: document.querySelector("#audioPlayer")
 };
 
 function escapeHtml(value) {
@@ -37,6 +38,9 @@ function render() {
   els.trackArtist.textContent = `${track.artist} · ${track.album}`;
   els.coverInitial.textContent = track.artist.slice(0, 1).toUpperCase();
   els.play.textContent = playing ? "Ⅱ" : "▶";
+  if (track.streamUrl && els.audio.src !== new URL(track.streamUrl, window.location.href).href) {
+    els.audio.src = track.streamUrl;
+  }
 
   els.queue.innerHTML = "";
   activeQueue.forEach((item, index) => {
@@ -112,7 +116,14 @@ document.querySelector("#nextBtn").addEventListener("click", () => {
 
 document.querySelector("#playBtn").addEventListener("click", () => {
   playing = !playing;
-  if (playing) sendPlayerEvent("play");
+  if (playing) {
+    sendPlayerEvent("play");
+    els.audio.play().catch(() => {
+      els.reason.textContent = "当前曲目还没有可播放音频，请先配置 LOCAL_MUSIC_DIR。";
+    });
+  } else {
+    els.audio.pause();
+  }
   render();
 });
 
@@ -168,13 +179,18 @@ async function boot() {
   const library = await response.json();
   savedState = await stateResponse.json();
   tracks = library.tracks;
+  const localScan = await fetch("/api/music/local/scan").then((item) => item.json()).catch(() => ({ tracks: [] }));
+  const hasLocalTracks = Boolean(localScan.configured && localScan.tracks.length);
+  if (localScan.configured && localScan.tracks.length) {
+    tracks = localScan.tracks;
+  }
   const byId = new Map(tracks.map((track) => [track.id, track]));
   queue = (savedState.queue || []).map((id) => byId.get(id)).filter(Boolean);
   currentIndex = Math.max(0, queue.findIndex((track) => track.id === savedState.currentTrackId));
 
   const planResponse = await fetch("/api/plan/today");
   const plan = await planResponse.json();
-  if (!queue.length) queue = plan.queue;
+  if (!queue.length) queue = hasLocalTracks ? tracks.slice(0, 5) : plan.queue;
   els.mode.textContent = plan.mode;
   document.querySelector("#providerPill").textContent = `${plan.aiProvider || "local"} brain`;
   els.reply.textContent = plan.reply;

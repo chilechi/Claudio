@@ -5,6 +5,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildPlan } from "./brain/recommender.js";
 import { callDeepSeek } from "./brain/deepseek.js";
+import { contentTypeForTrack, resolveLocalTrack, scanLocalMusic, streamLocalTrack } from "./music/local-music-provider.js";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
@@ -190,6 +191,27 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/config/status") {
       sendJson(response, 200, { providers: providerStatuses() });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/music/local/scan") {
+      sendJson(response, 200, await scanLocalMusic(config.localMusicDir));
+      return;
+    }
+
+    const streamMatch = url.pathname.match(/^\/api\/tracks\/([^/]+)\/stream$/);
+    if (request.method === "GET" && streamMatch) {
+      const track = await resolveLocalTrack(config.localMusicDir, decodeURIComponent(streamMatch[1]));
+      if (!track) {
+        sendJson(response, 404, { error: "Track not found or LOCAL_MUSIC_DIR is not configured" });
+        return;
+      }
+
+      response.writeHead(200, {
+        "Content-Type": contentTypeForTrack(track),
+        "Cache-Control": "no-store"
+      });
+      streamLocalTrack(track).pipe(response);
       return;
     }
 
