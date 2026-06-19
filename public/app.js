@@ -17,6 +17,8 @@ const els = {
   input: document.querySelector("#chatInput"),
   mic: document.querySelector("#micBtn"),
   mode: document.querySelector("#modePill"),
+  musicSource: document.querySelector("#musicSourcePill"),
+  sourceHint: document.querySelector("#sourceHint"),
   voice: document.querySelector("#voiceToggle"),
   settingsSummary: document.querySelector("#settingsSummary"),
   providerList: document.querySelector("#providerList"),
@@ -42,6 +44,22 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function aiProviderLabel(provider) {
+  return provider === "deepseek" ? "DeepSeek 脑" : "本地规则脑";
+}
+
+function musicSourceLabel(source) {
+  const selected = source?.selected || "auto";
+  const type = source?.type || "unknown";
+  const selectedLabel = { auto: "自动", local: "本地", netease: "网易云" }[selected] || selected;
+  const typeLabel = { local: "本地音乐", netease: "网易云歌单", unknown: "未知来源" }[type] || type;
+  return `${selectedLabel} · ${typeLabel}`;
+}
+
+function statusLabel(state) {
+  return { ready: "可用", fallback: "回退", missing: "缺少" }[state] || state;
+}
+
 function render() {
   const activeQueue = queue.length ? queue : tracks;
   const track = activeQueue[currentIndex];
@@ -49,8 +67,8 @@ function render() {
   els.trackTitle.textContent = track.title;
   els.trackArtist.textContent = `${track.artist} · ${track.album}`;
   els.coverInitial.textContent = track.artist.slice(0, 1).toUpperCase();
-  els.play.textContent = playing ? "Ⅱ" : "▶";
-  els.queueCount.textContent = `${activeQueue.length} TRACKS`;
+  els.play.textContent = playing ? "暂停" : "播放";
+  els.queueCount.textContent = `${activeQueue.length} 首`;
   if (track.streamUrl && els.audio.src !== new URL(track.streamUrl, window.location.href).href) {
     els.audio.src = track.streamUrl;
   }
@@ -63,7 +81,7 @@ function render() {
       <span class="queue-index">${String(index + 1).padStart(2, "0")}</span>
       <div>
         <p class="queue-title">${escapeHtml(item.title)}</p>
-        <p class="queue-meta">${escapeHtml(item.artist)} · ${escapeHtml(item.duration)}</p>
+        <p class="queue-meta">${escapeHtml(item.artist)} · ${escapeHtml(item.duration || "未知时长")}</p>
       </div>
     `;
     li.addEventListener("click", () => {
@@ -160,7 +178,7 @@ function startVoiceInput() {
   };
   recognition.onend = () => {
     els.mic.classList.remove("listening");
-    els.mic.textContent = "Mic";
+  els.mic.textContent = "语音";
   };
   recognition.start();
 }
@@ -221,7 +239,7 @@ els.mic.addEventListener("click", startVoiceInput);
 
 els.theme.addEventListener("click", () => {
   const light = document.body.classList.toggle("light");
-  els.theme.textContent = light ? "Light" : "Dark";
+  els.theme.textContent = light ? "亮色" : "暗色";
 });
 
 els.volume.addEventListener("input", () => {
@@ -262,7 +280,7 @@ async function sendChat(input) {
   currentIndex = 0;
   playing = true;
   els.mode.textContent = plan.mode;
-  document.querySelector("#providerPill").textContent = `${plan.aiProvider || "local"} brain`;
+  document.querySelector("#providerPill").textContent = aiProviderLabel(plan.aiProvider || "local");
   els.reply.textContent = plan.reply;
   els.reason.textContent = plan.reason;
   speak(plan.reply);
@@ -270,24 +288,21 @@ async function sendChat(input) {
 }
 
 async function boot() {
-  const [response, stateResponse] = await Promise.all([fetch("/api/library"), fetch("/api/state")]);
+  const [response, stateResponse] = await Promise.all([fetch("/api/music/active-library"), fetch("/api/state")]);
   const library = await response.json();
   savedState = await stateResponse.json();
   tracks = library.tracks;
-  const localScan = await fetch("/api/music/local/scan").then((item) => item.json()).catch(() => ({ tracks: [] }));
-  const hasLocalTracks = Boolean(localScan.configured && localScan.tracks.length);
-  if (localScan.configured && localScan.tracks.length) {
-    tracks = localScan.tracks;
-  }
+  els.musicSource.textContent = musicSourceLabel(library.source);
+  els.sourceHint.textContent = library.fallbackReason || `当前音乐源：${musicSourceLabel(library.source)}。`;
   const byId = new Map(tracks.map((track) => [track.id, track]));
   queue = (savedState.queue || []).map((id) => byId.get(id)).filter(Boolean);
   currentIndex = Math.max(0, queue.findIndex((track) => track.id === savedState.currentTrackId));
 
   const planResponse = await fetch("/api/plan/today");
   const plan = await planResponse.json();
-  if (!queue.length) queue = hasLocalTracks ? tracks.slice(0, 5) : plan.queue;
+  if (!queue.length) queue = plan.queue?.length ? plan.queue : tracks.slice(0, 5);
   els.mode.textContent = plan.mode;
-  document.querySelector("#providerPill").textContent = `${plan.aiProvider || "local"} brain`;
+  document.querySelector("#providerPill").textContent = aiProviderLabel(plan.aiProvider || "local");
   els.reply.textContent = plan.reply;
   els.reason.textContent = plan.reason;
   render();
@@ -306,9 +321,9 @@ async function loadProviderStatus() {
   const providers = diagnostics.providers || [];
 
   els.settingsSummary.innerHTML = `
-    <span>ready ${diagnostics.summary?.ready || 0}</span>
-    <span>fallback ${diagnostics.summary?.fallback || 0}</span>
-    <span>missing ${diagnostics.summary?.missing || 0}</span>
+    <span>可用 ${diagnostics.summary?.ready || 0}</span>
+    <span>回退 ${diagnostics.summary?.fallback || 0}</span>
+    <span>缺少 ${diagnostics.summary?.missing || 0}</span>
     <span>${escapeHtml(diagnostics.secretPolicy || "不展示密钥原文")}</span>
   `;
   els.providerList.innerHTML = "";
@@ -319,8 +334,8 @@ async function loadProviderStatus() {
     const envVars = (provider.envVars || []).join(" / ");
     item.innerHTML = `
       <strong>${escapeHtml(provider.label)}</strong>
-      <span>${escapeHtml(provider.state)}</span>
-      <p>${escapeHtml(provider.reason || "已配置")}</p>
+      <span>${escapeHtml(statusLabel(provider.state))}</span>
+      <p>${escapeHtml(provider.detail || provider.reason || "已配置")}</p>
       <small class="provider-env">${escapeHtml(envVars || "无需配置")}</small>
     `;
     els.providerList.appendChild(item);

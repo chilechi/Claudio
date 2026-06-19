@@ -46,6 +46,7 @@ const config = {
   deepseekApiKey: process.env.DEEPSEEK_API_KEY || "",
   deepseekModel: process.env.DEEPSEEK_MODEL || "deepseek-chat",
   deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
+  musicSource: normalizeMusicSource(process.env.MUSIC_SOURCE || "auto"),
   localMusicDir: process.env.LOCAL_MUSIC_DIR || "",
   neteasePlaylistId: process.env.NETEASE_PLAYLIST_ID || "",
   neteaseCookie: process.env.NETEASE_COOKIE || "",
@@ -57,6 +58,10 @@ const config = {
   upnpEnabled: process.env.UPNP_ENABLED || "",
   upnpDeviceName: process.env.UPNP_DEVICE_NAME || ""
 };
+
+function normalizeMusicSource(value) {
+  return ["auto", "local", "netease"].includes(value) ? value : "auto";
+}
 
 function sendJson(response, status, data) {
   response.writeHead(status, {
@@ -89,16 +94,42 @@ async function loadLibrary() {
 
 async function loadPlanningLibrary() {
   const local = await scanLocalMusic(config.localMusicDir);
+  const imported = await loadLibrary();
+
+  if (config.musicSource === "local") {
+    if (local.configured && local.tracks.length) {
+      return {
+        source: { name: "本地音乐目录", type: "local", selected: config.musicSource },
+        tracks: local.tracks
+      };
+    }
+
+    return {
+      source: { name: "本地音乐目录", type: "local", selected: config.musicSource },
+      tracks: [],
+      fallbackReason: "MUSIC_SOURCE=local，但 LOCAL_MUSIC_DIR 未配置或没有可识别音频。"
+    };
+  }
+
+  if (config.musicSource === "netease") {
+    return {
+      ...imported,
+      source: { ...imported.source, type: "netease", selected: config.musicSource },
+      fallbackReason: "网易云当前作为歌单元数据和口味来源；真实播放仍需要本地音频或后续播放适配。"
+    };
+  }
+
   if (local.configured && local.tracks.length) {
     return {
-      source: { name: "本地音乐目录", type: "local" },
+      source: { name: "本地音乐目录", type: "local", selected: config.musicSource },
       tracks: local.tracks
     };
   }
 
   return {
-    ...(await loadLibrary()),
-    fallbackReason: "未配置 LOCAL_MUSIC_DIR，当前队列只能使用导入的歌单元数据"
+    ...imported,
+    source: { ...imported.source, type: "netease", selected: config.musicSource },
+    fallbackReason: "MUSIC_SOURCE=auto，未找到本地可播放音频，当前使用网易云歌单元数据。"
   };
 }
 
@@ -113,6 +144,7 @@ async function saveState(state) {
 
 function providerStatuses() {
   return [
+    providerStatus("music-source", "音乐源选择", true, undefined, undefined, ["MUSIC_SOURCE"], `当前：${config.musicSource}`),
     providerStatus("local-music", "本地音乐目录", Boolean(config.localMusicDir), "缺少 LOCAL_MUSIC_DIR", undefined, ["LOCAL_MUSIC_DIR"]),
     providerStatus("deepseek", "DeepSeek AI DJ", Boolean(config.deepseekApiKey), "缺少 DEEPSEEK_API_KEY", undefined, ["DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "DEEPSEEK_BASE_URL"]),
     providerStatus("netease", "网易云歌单", Boolean(config.neteasePlaylistId), "缺少 NETEASE_PLAYLIST_ID", undefined, ["NETEASE_PLAYLIST_ID", "NETEASE_COOKIE", "NETEASE_API_BASE_URL"]),
@@ -124,13 +156,14 @@ function providerStatuses() {
   ];
 }
 
-function providerStatus(id, label, configured, reason, fallbackState, envVars = []) {
+function providerStatus(id, label, configured, reason, fallbackState, envVars = [], detail) {
   return {
     id,
     label,
     configured,
     state: configured ? "ready" : fallbackState || "missing",
     reason: configured ? undefined : reason,
+    detail,
     envVars,
     docs: "docs/phases/v0.2/missing-inputs.md"
   };
@@ -236,6 +269,11 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/music/local/scan") {
       sendJson(response, 200, await scanLocalMusic(config.localMusicDir));
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/music/active-library") {
+      sendJson(response, 200, await loadPlanningLibrary());
       return;
     }
 

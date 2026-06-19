@@ -40,6 +40,7 @@ Invoke-RestMethod http://localhost:8080/api/health
 
 ```env
 PORT=8080
+MUSIC_SOURCE=auto
 AI_PROVIDER=deepseek
 DEEPSEEK_API_KEY=
 DEEPSEEK_MODEL=deepseek-chat
@@ -47,6 +48,12 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
 
 如果 `DEEPSEEK_API_KEY` 为空，Claudio 会自动使用本地规则脑。DeepSeek 请求失败时也会回退，不阻塞电台使用。
+
+`MUSIC_SOURCE` 可选：
+
+- `auto`：有本地可播放音频时优先本地，否则使用网易云歌单元数据。
+- `local`：只使用本地音乐目录。
+- `netease`：使用网易云歌单元数据。当前不保证能直接播放网易云音频。
 
 ## 代理
 
