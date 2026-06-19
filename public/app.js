@@ -15,6 +15,7 @@ const els = {
   reason: document.querySelector("#reason"),
   form: document.querySelector("#chatForm"),
   input: document.querySelector("#chatInput"),
+  mic: document.querySelector("#micBtn"),
   mode: document.querySelector("#modePill"),
   voice: document.querySelector("#voiceToggle"),
   providerList: document.querySelector("#providerList"),
@@ -128,6 +129,38 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
+function browserSpeechRecognition() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function startVoiceInput() {
+  const SpeechRecognition = browserSpeechRecognition();
+  if (!SpeechRecognition) {
+    els.reason.textContent = "当前浏览器不支持语音输入。";
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = "zh-CN";
+  recognition.interimResults = false;
+  recognition.continuous = false;
+
+  els.mic.classList.add("listening");
+  els.mic.textContent = "听";
+  recognition.onresult = (event) => {
+    const text = event.results?.[0]?.[0]?.transcript || "";
+    els.input.value = text;
+  };
+  recognition.onerror = () => {
+    els.reason.textContent = "语音输入没有成功，先用文字也可以。";
+  };
+  recognition.onend = () => {
+    els.mic.classList.remove("listening");
+    els.mic.textContent = "Mic";
+  };
+  recognition.start();
+}
+
 document.querySelector("#prevBtn").addEventListener("click", () => {
   const size = (queue.length ? queue : tracks).length;
   currentIndex = (currentIndex - 1 + size) % size;
@@ -179,6 +212,8 @@ document.querySelector("#skipBtn").addEventListener("click", () => {
 document.querySelectorAll("[data-mode]").forEach((button) => {
   button.addEventListener("click", () => setMode(button.dataset.mode));
 });
+
+els.mic.addEventListener("click", startVoiceInput);
 
 els.theme.addEventListener("click", () => {
   const light = document.body.classList.toggle("light");

@@ -349,7 +349,7 @@ h2 {
 
 .composer {
   display: grid;
-  grid-template-columns: 1fr 88px;
+  grid-template-columns: 1fr 64px 88px;
   gap: 10px;
   margin-top: 16px;
 }
@@ -373,6 +373,18 @@ h2 {
   color: #111;
   background: var(--amber);
   border-color: var(--amber);
+}
+
+.composer #micBtn {
+  color: var(--text);
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+.composer #micBtn.listening {
+  color: #111;
+  background: var(--green);
+  border-color: var(--green);
 }
 
 .quick-actions {
