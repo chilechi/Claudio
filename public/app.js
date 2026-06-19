@@ -14,7 +14,8 @@ const els = {
   reason: document.querySelector("#reason"),
   form: document.querySelector("#chatForm"),
   input: document.querySelector("#chatInput"),
-  mode: document.querySelector("#modePill")
+  mode: document.querySelector("#modePill"),
+  voice: document.querySelector("#voiceToggle")
 };
 
 function escapeHtml(value) {
@@ -66,6 +67,18 @@ function setMode(mode) {
   els.mode.textContent = mode;
   els.reply.textContent = reply;
   els.reason.textContent = reason;
+  speak(reply);
+}
+
+function speak(text) {
+  if (!els.voice?.checked || !("speechSynthesis" in window)) return;
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text.replace(/\n/g, " "));
+  utterance.lang = "zh-CN";
+  utterance.rate = 0.92;
+  utterance.pitch = 0.92;
+  window.speechSynthesis.speak(utterance);
 }
 
 document.querySelector("#prevBtn").addEventListener("click", () => {
@@ -126,6 +139,7 @@ async function sendChat(input) {
   document.querySelector("#providerPill").textContent = `${plan.aiProvider || "local"} brain`;
   els.reply.textContent = plan.reply;
   els.reason.textContent = plan.reason;
+  speak(plan.reply);
   render();
 }
 
