@@ -7,6 +7,7 @@ import { buildPlan } from "./brain/recommender.js";
 import { callDeepSeek } from "./brain/deepseek.js";
 import { contentTypeForTrack, resolveLocalTrack, scanLocalMusic, streamLocalTrack } from "./music/local-music-provider.js";
 import { fetchNeteasePlaylist, importNeteasePlaylistToDb } from "./music/netease-provider.js";
+import { buildRadioPlan, buildTasteProfile } from "./radio/routines.js";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
@@ -211,6 +212,11 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/providers/status") {
+      sendJson(response, 200, { providers: providerStatuses() });
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/music/local/scan") {
       sendJson(response, 200, await scanLocalMusic(config.localMusicDir));
       return;
@@ -266,6 +272,24 @@ const server = createServer(async (request, response) => {
       const library = await loadPlanningLibrary();
       const state = await loadState();
       sendJson(response, 200, await planWithAiOrLocal("今晚想听安静一点", library, state));
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/radio/today") {
+      const library = await loadPlanningLibrary();
+      const state = await loadState();
+      const hour = url.searchParams.has("hour") ? Number(url.searchParams.get("hour")) : new Date().getHours();
+      sendJson(response, 200, buildRadioPlan({ tracks: library.tracks, state, hour }));
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/taste/profile") {
+      const library = await loadPlanningLibrary();
+      const state = await loadState();
+      sendJson(response, 200, {
+        source: library.source,
+        profile: buildTasteProfile(library.tracks, state)
+      });
       return;
     }
 

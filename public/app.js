@@ -19,6 +19,9 @@ const els = {
   mode: document.querySelector("#modePill"),
   voice: document.querySelector("#voiceToggle"),
   providerList: document.querySelector("#providerList"),
+  routineSegments: document.querySelector("#routineSegments"),
+  tasteTags: document.querySelector("#tasteTags"),
+  tasteSummary: document.querySelector("#tasteSummary"),
   audio: document.querySelector("#audioPlayer"),
   clock: document.querySelector("#clockText"),
   queueCount: document.querySelector("#queueCount"),
@@ -287,7 +290,13 @@ async function boot() {
   els.reply.textContent = plan.reply;
   els.reason.textContent = plan.reason;
   render();
-  loadProviderStatus();
+  loadProviderStatus().catch(() => {});
+  loadRadioPlan().catch(() => {
+    els.reason.textContent = "今日电台没有生成成功，请检查服务端日志。";
+  });
+  loadTasteProfile().catch(() => {
+    els.tasteSummary.textContent = "长期口味暂时不可用。";
+  });
 }
 
 async function loadProviderStatus() {
@@ -304,6 +313,53 @@ async function loadProviderStatus() {
       <p>${escapeHtml(provider.reason || "已配置")}</p>
     `;
     els.providerList.appendChild(item);
+  }
+}
+
+async function loadRadioPlan() {
+  const response = await fetch("/api/radio/today");
+  const plan = await response.json();
+  if (!response.ok) throw new Error(plan.error || "radio plan failed");
+
+  els.reason.textContent = plan.reason;
+  els.routineSegments.innerHTML = "";
+
+  const slotItem = document.createElement("div");
+  slotItem.className = "routine-item";
+  slotItem.innerHTML = `
+    <strong>${escapeHtml(plan.slot?.label || plan.mode)}</strong>
+    <span>${escapeHtml(plan.slot?.prompt || plan.reply || "")}</span>
+  `;
+  els.routineSegments.appendChild(slotItem);
+
+  const calendarItem = document.createElement("div");
+  calendarItem.className = "routine-item";
+  calendarItem.innerHTML = `
+    <strong>日历</strong>
+    <span>${escapeHtml(plan.calendar?.configured ? "已连接" : plan.calendar?.reason || "未连接")}</span>
+  `;
+  els.routineSegments.appendChild(calendarItem);
+}
+
+async function loadTasteProfile() {
+  const response = await fetch("/api/taste/profile");
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "taste profile failed");
+
+  const profile = data.profile || {};
+  els.tasteSummary.textContent = `喜欢 ${profile.likedCount || 0} 首，跳过 ${profile.skippedCount || 0} 首。画像来自当前真实歌库和播放事件。`;
+  els.tasteTags.innerHTML = "";
+
+  for (const item of profile.topTags || []) {
+    const tag = document.createElement("span");
+    tag.textContent = `${item.tag} · ${item.score}`;
+    els.tasteTags.appendChild(tag);
+  }
+
+  if (!els.tasteTags.children.length) {
+    const empty = document.createElement("span");
+    empty.textContent = "暂无足够口味记录";
+    els.tasteTags.appendChild(empty);
   }
 }
 
