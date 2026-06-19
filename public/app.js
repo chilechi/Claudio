@@ -1,4 +1,5 @@
 let tracks = [];
+let queue = [];
 
 let currentIndex = 0;
 let playing = false;
@@ -26,7 +27,8 @@ function escapeHtml(value) {
 }
 
 function render() {
-  const track = tracks[currentIndex];
+  const activeQueue = queue.length ? queue : tracks;
+  const track = activeQueue[currentIndex];
   if (!track) return;
   els.trackTitle.textContent = track.title;
   els.trackArtist.textContent = `${track.artist} · ${track.album}`;
@@ -34,7 +36,7 @@ function render() {
   els.play.textContent = playing ? "Ⅱ" : "▶";
 
   els.queue.innerHTML = "";
-  tracks.forEach((item, index) => {
+  activeQueue.forEach((item, index) => {
     const li = document.createElement("li");
     li.className = index === currentIndex ? "active" : "";
     li.innerHTML = `
@@ -67,12 +69,14 @@ function setMode(mode) {
 }
 
 document.querySelector("#prevBtn").addEventListener("click", () => {
-  currentIndex = (currentIndex - 1 + tracks.length) % tracks.length;
+  const size = (queue.length ? queue : tracks).length;
+  currentIndex = (currentIndex - 1 + size) % size;
   render();
 });
 
 document.querySelector("#nextBtn").addEventListener("click", () => {
-  currentIndex = (currentIndex + 1) % tracks.length;
+  const size = (queue.length ? queue : tracks).length;
+  currentIndex = (currentIndex + 1) % size;
   render();
 });
 
@@ -86,7 +90,8 @@ document.querySelector("#likeBtn").addEventListener("click", () => {
 });
 
 document.querySelector("#skipBtn").addEventListener("click", () => {
-  currentIndex = (currentIndex + 1) % tracks.length;
+  const size = (queue.length ? queue : tracks).length;
+  currentIndex = (currentIndex + 1) % size;
   els.reason.textContent = "这首先避开，队列往后走。";
   render();
 });
@@ -100,16 +105,39 @@ els.form.addEventListener("submit", (event) => {
   const input = els.input.value.trim();
   if (!input) return;
   els.input.value = "";
-  const mode = /代码|学习|专注/.test(input) ? "coding" : /emo|难过|低落/.test(input) ? "emo" : /睡|困/.test(input) ? "bedtime" : "night";
-  setMode(mode);
+  sendChat(input).catch((error) => {
+    els.reply.textContent = "刚才没有接住。先保持当前队列。";
+    console.error(error);
+  });
 });
 
-render();
+async function sendChat(input) {
+  els.reply.textContent = "Claudio 正在整理这一轮。";
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input })
+  });
+  const plan = await response.json();
+  queue = plan.queue;
+  currentIndex = 0;
+  playing = true;
+  els.mode.textContent = plan.mode;
+  els.reply.textContent = plan.reply;
+  els.reason.textContent = plan.reason;
+  render();
+}
 
 async function boot() {
   const response = await fetch("/api/library");
   const library = await response.json();
-  tracks = library.tracks.slice(0, 5);
+  tracks = library.tracks;
+  const planResponse = await fetch("/api/plan/today");
+  const plan = await planResponse.json();
+  queue = plan.queue;
+  els.mode.textContent = plan.mode;
+  els.reply.textContent = plan.reply;
+  els.reason.textContent = plan.reason;
   render();
 }
 

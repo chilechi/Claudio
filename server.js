@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildPlan } from "./brain/recommender.js";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
@@ -51,6 +52,17 @@ async function readJsonFile(filePath) {
   return JSON.parse(await readFile(filePath, "utf8"));
 }
 
+async function readBody(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  const raw = Buffer.concat(chunks).toString("utf8");
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function loadLibrary() {
+  return readJsonFile(join(dataDir, "library.json"));
+}
+
 function safeStaticPath(urlPath) {
   const decoded = decodeURIComponent(urlPath === "/" ? "/index.html" : urlPath);
   const normalized = normalize(decoded).replace(/^(\.\.[/\\])+/, "");
@@ -92,7 +104,26 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/library") {
-      sendJson(response, 200, await readJsonFile(join(dataDir, "library.json")));
+      sendJson(response, 200, await loadLibrary());
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/plan/today") {
+      const library = await loadLibrary();
+      sendJson(response, 200, buildPlan("今晚想听安静一点", library.tracks));
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/chat") {
+      const body = await readBody(request);
+      const input = String(body.input || "").trim();
+      if (!input) {
+        sendJson(response, 400, { error: "input is required" });
+        return;
+      }
+
+      const library = await loadLibrary();
+      sendJson(response, 200, buildPlan(input, library.tracks));
       return;
     }
 
