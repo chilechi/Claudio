@@ -21,13 +21,18 @@ const modeTags = {
   clear: ["light", "groove", "band", "rnb", "warm"]
 };
 
-export function recommendTracks(tracks, mode, count = 5) {
+export function recommendTracks(tracks, mode, count = 5, state = {}) {
   const desiredTags = modeTags[mode] || modeTags.night;
+  const skipped = new Set(state.skipped || []);
+  const liked = new Set(state.liked || []);
 
   return [...tracks]
+    .filter((track) => !skipped.has(track.id))
     .map((track) => {
       const tags = new Set(track.tags || []);
-      const score = desiredTags.reduce((sum, tag) => sum + (tags.has(tag) ? 2 : 0), 0);
+      const tagScore = desiredTags.reduce((sum, tag) => sum + (tags.has(tag) ? 2 : 0), 0);
+      const likeScore = liked.has(track.id) ? 3 : 0;
+      const score = tagScore + likeScore;
       return { track, score };
     })
     .sort((a, b) => b.score - a.score || a.track.title.localeCompare(b.track.title, "zh-Hans-CN"))
@@ -62,9 +67,9 @@ export function localReply(mode, tracks) {
   return replies[mode] || replies.night;
 }
 
-export function buildPlan(input, tracks) {
+export function buildPlan(input, tracks, state = {}) {
   const mode = inferMode(input);
-  const queue = recommendTracks(tracks, mode, 5);
+  const queue = recommendTracks(tracks, mode, 5, state);
 
   return {
     mode,

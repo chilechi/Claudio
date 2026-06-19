@@ -1,5 +1,6 @@
 let tracks = [];
 let queue = [];
+let savedState = null;
 
 let currentIndex = 0;
 let playing = false;
@@ -50,10 +51,25 @@ function render() {
     li.addEventListener("click", () => {
       currentIndex = index;
       playing = true;
+      sendPlayerEvent("play", item.id);
       render();
     });
     els.queue.appendChild(li);
   });
+}
+
+function currentTrack() {
+  const activeQueue = queue.length ? queue : tracks;
+  return activeQueue[currentIndex];
+}
+
+async function sendPlayerEvent(type, trackId = currentTrack()?.id) {
+  if (!trackId) return;
+  await fetch("/api/player/event", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, trackId })
+  }).catch(() => {});
 }
 
 function setMode(mode) {
@@ -95,14 +111,17 @@ document.querySelector("#nextBtn").addEventListener("click", () => {
 
 document.querySelector("#playBtn").addEventListener("click", () => {
   playing = !playing;
+  if (playing) sendPlayerEvent("play");
   render();
 });
 
 document.querySelector("#likeBtn").addEventListener("click", () => {
+  sendPlayerEvent("like");
   els.reason.textContent = "已经记下这一首。后面会多给一点相近的声音。";
 });
 
 document.querySelector("#skipBtn").addEventListener("click", () => {
+  sendPlayerEvent("skip");
   const size = (queue.length ? queue : tracks).length;
   currentIndex = (currentIndex + 1) % size;
   els.reason.textContent = "这首先避开，队列往后走。";
@@ -144,12 +163,17 @@ async function sendChat(input) {
 }
 
 async function boot() {
-  const response = await fetch("/api/library");
+  const [response, stateResponse] = await Promise.all([fetch("/api/library"), fetch("/api/state")]);
   const library = await response.json();
+  savedState = await stateResponse.json();
   tracks = library.tracks;
+  const byId = new Map(tracks.map((track) => [track.id, track]));
+  queue = (savedState.queue || []).map((id) => byId.get(id)).filter(Boolean);
+  currentIndex = Math.max(0, queue.findIndex((track) => track.id === savedState.currentTrackId));
+
   const planResponse = await fetch("/api/plan/today");
   const plan = await planResponse.json();
-  queue = plan.queue;
+  if (!queue.length) queue = plan.queue;
   els.mode.textContent = plan.mode;
   document.querySelector("#providerPill").textContent = `${plan.aiProvider || "local"} brain`;
   els.reply.textContent = plan.reply;

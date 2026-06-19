@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,6 +57,10 @@ async function readJsonFile(filePath) {
   return JSON.parse(await readFile(filePath, "utf8"));
 }
 
+async function writeJsonFile(filePath, data) {
+  await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
 async function readBody(request) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
@@ -68,7 +72,16 @@ async function loadLibrary() {
   return readJsonFile(join(dataDir, "library.json"));
 }
 
-async function planWithAiOrLocal(input, library) {
+async function loadState() {
+  return readJsonFile(join(dataDir, "state.json"));
+}
+
+async function saveState(state) {
+  state.updatedAt = new Date().toISOString();
+  await writeJsonFile(join(dataDir, "state.json"), state);
+}
+
+async function planWithAiOrLocal(input, library, state = {}) {
   if (config.aiProvider === "deepseek" && config.deepseekApiKey) {
     try {
       const aiPlan = await callDeepSeek({ config, input, library });
@@ -91,7 +104,7 @@ async function planWithAiOrLocal(input, library) {
   }
 
   return {
-    ...buildPlan(input, library.tracks),
+    ...buildPlan(input, library.tracks, state),
     aiProvider: "local"
   };
 }
@@ -141,9 +154,15 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/state") {
+      sendJson(response, 200, await loadState());
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/plan/today") {
       const library = await loadLibrary();
-      sendJson(response, 200, await planWithAiOrLocal("今晚想听安静一点", library));
+      const state = await loadState();
+      sendJson(response, 200, await planWithAiOrLocal("今晚想听安静一点", library, state));
       return;
     }
 
@@ -156,7 +175,36 @@ const server = createServer(async (request, response) => {
       }
 
       const library = await loadLibrary();
-      sendJson(response, 200, await planWithAiOrLocal(input, library));
+      const state = await loadState();
+      const plan = await planWithAiOrLocal(input, library, state);
+
+      state.mode = plan.mode;
+      state.queue = plan.queue.map((track) => track.id);
+      state.currentTrackId = state.queue[0] || state.currentTrackId;
+      state.recentPrompts = [{ input, reply: plan.reply, at: new Date().toISOString() }, ...(state.recentPrompts || [])].slice(0, 12);
+      await saveState(state);
+
+      sendJson(response, 200, plan);
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/player/event") {
+      const body = await readBody(request);
+      const state = await loadState();
+      const trackId = String(body.trackId || "");
+
+      if (body.type === "like" && trackId && !state.liked.includes(trackId)) {
+        state.liked.push(trackId);
+      }
+      if (body.type === "skip" && trackId && !state.skipped.includes(trackId)) {
+        state.skipped.push(trackId);
+      }
+      if (body.type === "play" && trackId) {
+        state.currentTrackId = trackId;
+      }
+
+      await saveState(state);
+      sendJson(response, 200, state);
       return;
     }
 
