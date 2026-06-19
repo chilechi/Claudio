@@ -17,12 +17,17 @@
           <span id="providerPill">local brain</span>
           <span id="modePill">night</span>
           <span>NetEase taste</span>
+          <button id="themeToggle" class="theme-toggle" type="button">Dark</button>
         </div>
       </header>
 
       <section class="workspace" aria-label="电台控制台">
         <aside class="panel player-panel">
           <p class="panel-label">PLAYER</p>
+          <div class="clock-panel">
+            <span id="clockText">--:--</span>
+            <small id="onAirText">● ON AIR</small>
+          </div>
           <div class="cover" aria-hidden="true">
             <span id="coverInitial">C</span>
           </div>
@@ -44,6 +49,21 @@
             <button id="nextBtn" type="button" title="下一首">›</button>
             <button id="likeBtn" type="button" title="喜欢">♡</button>
             <button id="skipBtn" type="button" title="跳过">↷</button>
+          </div>
+
+          <div class="transport">
+            <span id="currentTime">0:00</span>
+            <input id="progressRange" type="range" min="0" max="1000" value="0" />
+            <span id="durationTime">0:00</span>
+          </div>
+
+          <div class="utility-controls">
+            <button id="hideBtn" type="button">Hide</button>
+            <button id="favBtn" type="button">Fav</button>
+            <label>
+              Vol
+              <input id="volumeRange" type="range" min="0" max="1" step="0.01" value="0.8" />
+            </label>
           </div>
 
           <p class="tiny">真实网易云播放后续接入；当前先跑通界面、队列、AI 和语音闭环。</p>
@@ -77,6 +97,7 @@
 
         <aside class="panel queue-panel">
           <p class="panel-label">QUEUE</p>
+          <p id="queueCount" class="queue-count">0 TRACKS</p>
           <ol id="queue" class="queue"></ol>
         </aside>
       </section>

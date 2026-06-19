@@ -18,7 +18,14 @@ const els = {
   mode: document.querySelector("#modePill"),
   voice: document.querySelector("#voiceToggle"),
   providerList: document.querySelector("#providerList"),
-  audio: document.querySelector("#audioPlayer")
+  audio: document.querySelector("#audioPlayer"),
+  clock: document.querySelector("#clockText"),
+  queueCount: document.querySelector("#queueCount"),
+  currentTime: document.querySelector("#currentTime"),
+  durationTime: document.querySelector("#durationTime"),
+  progress: document.querySelector("#progressRange"),
+  volume: document.querySelector("#volumeRange"),
+  theme: document.querySelector("#themeToggle")
 };
 
 function escapeHtml(value) {
@@ -38,6 +45,7 @@ function render() {
   els.trackArtist.textContent = `${track.artist} · ${track.album}`;
   els.coverInitial.textContent = track.artist.slice(0, 1).toUpperCase();
   els.play.textContent = playing ? "Ⅱ" : "▶";
+  els.queueCount.textContent = `${activeQueue.length} TRACKS`;
   if (track.streamUrl && els.audio.src !== new URL(track.streamUrl, window.location.href).href) {
     els.audio.src = track.streamUrl;
   }
@@ -61,6 +69,24 @@ function render() {
     });
     els.queue.appendChild(li);
   });
+}
+
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds)) return "0:00";
+  const minutes = Math.floor(seconds / 60);
+  const rest = String(Math.floor(seconds % 60)).padStart(2, "0");
+  return `${minutes}:${rest}`;
+}
+
+function updateClock() {
+  const now = new Date();
+  els.clock.textContent = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+function updateProgress() {
+  els.currentTime.textContent = formatTime(els.audio.currentTime);
+  els.durationTime.textContent = formatTime(els.audio.duration);
+  els.progress.value = Number.isFinite(els.audio.duration) && els.audio.duration > 0 ? String(Math.round((els.audio.currentTime / els.audio.duration) * 1000)) : "0";
 }
 
 function currentTrack() {
@@ -132,6 +158,16 @@ document.querySelector("#likeBtn").addEventListener("click", () => {
   els.reason.textContent = "已经记下这一首。后面会多给一点相近的声音。";
 });
 
+document.querySelector("#favBtn").addEventListener("click", () => {
+  sendPlayerEvent("like");
+  els.reason.textContent = "已收藏当前声音。";
+});
+
+document.querySelector("#hideBtn").addEventListener("click", () => {
+  sendPlayerEvent("skip");
+  els.reason.textContent = "这首会暂时隐藏，后续少推荐。";
+});
+
 document.querySelector("#skipBtn").addEventListener("click", () => {
   sendPlayerEvent("skip");
   const size = (queue.length ? queue : tracks).length;
@@ -142,6 +178,26 @@ document.querySelector("#skipBtn").addEventListener("click", () => {
 
 document.querySelectorAll("[data-mode]").forEach((button) => {
   button.addEventListener("click", () => setMode(button.dataset.mode));
+});
+
+els.theme.addEventListener("click", () => {
+  const light = document.body.classList.toggle("light");
+  els.theme.textContent = light ? "Light" : "Dark";
+});
+
+els.volume.addEventListener("input", () => {
+  els.audio.volume = Number(els.volume.value);
+});
+
+els.progress.addEventListener("input", () => {
+  if (!Number.isFinite(els.audio.duration) || els.audio.duration <= 0) return;
+  els.audio.currentTime = (Number(els.progress.value) / 1000) * els.audio.duration;
+});
+
+els.audio.addEventListener("timeupdate", updateProgress);
+els.audio.addEventListener("loadedmetadata", updateProgress);
+els.audio.addEventListener("ended", () => {
+  document.querySelector("#nextBtn").click();
 });
 
 els.form.addEventListener("submit", (event) => {
@@ -220,3 +276,6 @@ boot().catch((error) => {
   els.reply.textContent = "Claudio 没能读到歌单。先保持安静。";
   console.error(error);
 });
+
+updateClock();
+setInterval(updateClock, 30_000);

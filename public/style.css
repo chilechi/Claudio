@@ -38,6 +38,17 @@ body {
   letter-spacing: 0;
 }
 
+body.light {
+  --bg: #f3f0e8;
+  --panel: #ffffff;
+  --panel-soft: #f1eee7;
+  --line: #c8c0b4;
+  --line-bright: #8f877b;
+  --text: #151515;
+  --muted: #5c6470;
+  --dim: #7c817f;
+}
+
 button,
 input {
   font: inherit;
@@ -86,6 +97,7 @@ h1 {
 }
 
 .status-strip span,
+.theme-toggle,
 .tags span,
 .quick-actions button {
   border: 1px solid var(--line);
@@ -93,6 +105,31 @@ h1 {
   padding: 8px 12px;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.03);
+}
+
+.theme-toggle {
+  text-transform: uppercase;
+}
+
+.clock-panel {
+  display: grid;
+  place-items: center;
+  min-height: 138px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  margin-bottom: 18px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+#clockText {
+  font-family: "Courier New", monospace;
+  font-size: 58px;
+  font-weight: 800;
+}
+
+#onAirText {
+  color: var(--green);
+  letter-spacing: 0.12em;
 }
 
 .workspace {
@@ -229,6 +266,44 @@ h2 {
   margin-bottom: 18px;
 }
 
+.transport {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.transport input,
+.utility-controls input {
+  accent-color: var(--green);
+}
+
+.utility-controls {
+  display: grid;
+  grid-template-columns: 72px 72px 1fr;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.utility-controls button {
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.utility-controls label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .controls button,
 .composer button {
   height: 46px;
@@ -318,6 +393,13 @@ h2 {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.queue-count {
+  margin: -8px 0 14px;
+  color: var(--dim);
+  font-family: "Courier New", monospace;
+  text-align: right;
 }
 
 .queue li {
