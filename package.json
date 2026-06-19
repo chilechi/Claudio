@@ -3,9 +3,10 @@
   "version": "0.2.0",
   "description": "电脑端本地个人 AI 电台",
   "type": "module",
-  "main": "apps/server/dist/index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node apps/server/dist/index.js",
+    "start": "node server.js",
+    "start:compiled": "node apps/server/dist/index.js",
     "start:legacy": "node server.js",
     "dev:server": "npm run build:server && node --watch apps/server/dist/index.js",
     "dev:web": "vite --host 127.0.0.1 --port 5173 apps/web",
