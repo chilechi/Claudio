@@ -14,6 +14,12 @@
   - `missing-inputs.md`：外部配置、素材、依赖缺口。
   - `loops/`：v0.2 每个开发 Loop。
   - `validation/`：v0.2 每轮验收和最终 E2E。
+- `phases/v0.3/`：完整前后端工程化迁移。
+  - `checklist.md`：v0.3 总清单。
+  - `technical-plan.md`：长期架构和技术选型。
+  - `strict-acceptance.md`：严格验收标准，包含播放器真实交互。
+  - `loops/`：v0.3 每个开发 Loop。
+  - `validation/`：v0.3 每轮验收记录。
 
 ## 运行代码
 
