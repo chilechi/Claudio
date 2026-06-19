@@ -38,6 +38,6 @@ git -C D:\workspace\Claudio remote -v
 
 ```powershell
 git add .
-git commit -m "chore: initialize Claudio planning docs"
+git commit -m "文档：初始化 Claudio 规划清单"
 git push origin main
 ```

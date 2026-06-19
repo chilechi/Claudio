@@ -58,6 +58,6 @@
 
 ```powershell
 git add .
-git commit -m "feat: add initial NetEase taste library"
+git commit -m "功能：添加网易云初始口味歌库"
 git push origin main
 ```

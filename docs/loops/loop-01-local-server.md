@@ -37,6 +37,6 @@ curl http://localhost:8080/api/health
 
 ```powershell
 git add .
-git commit -m "feat: add local server baseline"
+git commit -m "功能：添加本地服务基线"
 git push origin main
 ```

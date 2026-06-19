@@ -29,6 +29,6 @@
 
 ```powershell
 git add .
-git commit -m "feat: add browser voice replies"
+git commit -m "功能：添加浏览器语音回应"
 git push origin main
 ```

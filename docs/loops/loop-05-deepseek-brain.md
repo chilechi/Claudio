@@ -39,6 +39,6 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 
 ```powershell
 git add .
-git commit -m "feat: add DeepSeek planning brain"
+git commit -m "功能：添加 DeepSeek 规划脑"
 git push origin main
 ```

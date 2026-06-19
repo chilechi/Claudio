@@ -46,6 +46,6 @@ npm start
 
 ```powershell
 git add .
-git commit -m "feat: add desktop radio interface"
+git commit -m "功能：添加电脑端电台界面"
 git push origin main
 ```

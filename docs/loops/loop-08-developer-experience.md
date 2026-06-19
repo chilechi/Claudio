@@ -31,6 +31,6 @@ npm start
 
 ```powershell
 git add .
-git commit -m "docs: add setup and operation guide"
+git commit -m "文档：添加配置与运行说明"
 git push origin main
 ```

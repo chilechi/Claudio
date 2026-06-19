@@ -40,7 +40,7 @@
 
 ```powershell
 git add .
-git commit -m "chore: verify desktop MVP"
+git commit -m "验证：完成电脑端 MVP 验收"
 git push origin main
 ```
 

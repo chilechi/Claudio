@@ -13,6 +13,7 @@
 - 工作目录：`D:\workspace\Claudio`
 - GitHub 仓库：`https://github.com/chilechi/Claudio.git`
 - 每完成一个可验收 Loop，必须提交并推送到 GitHub。
+- commit message 使用中文，简短说明本轮完成的内容。
 - 必要代码注释使用中文，尤其是业务规则、AI prompt、推荐逻辑、配置回退逻辑。
 - 不把 API Key、Cookie、Token、网易云登录态写进仓库。
 - DeepSeek Key 只放本地 `.env`。

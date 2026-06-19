@@ -41,6 +41,6 @@
 
 ```powershell
 git add .
-git commit -m "feat: persist Claudio listening state"
+git commit -m "功能：持久化 Claudio 收听状态"
 git push origin main
 ```

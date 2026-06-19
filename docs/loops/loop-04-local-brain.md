@@ -41,6 +41,6 @@
 
 ```powershell
 git add .
-git commit -m "feat: add local recommendation brain"
+git commit -m "功能：添加本地推荐脑"
 git push origin main
 ```
