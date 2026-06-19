@@ -54,7 +54,9 @@ function sendJson(response, status, data) {
 }
 
 async function readJsonFile(filePath) {
-  return JSON.parse(await readFile(filePath, "utf8"));
+  const content = await readFile(filePath, "utf8");
+  // Windows 工具可能写入 UTF-8 BOM，这里剥掉，避免状态文件无法解析。
+  return JSON.parse(content.replace(/^\uFEFF/, ""));
 }
 
 async function writeJsonFile(filePath, data) {
