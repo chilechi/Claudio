@@ -86,6 +86,21 @@ async function loadLibrary() {
   return readJsonFile(join(dataDir, "library.json"));
 }
 
+async function loadPlanningLibrary() {
+  const local = await scanLocalMusic(config.localMusicDir);
+  if (local.configured && local.tracks.length) {
+    return {
+      source: { name: "本地音乐目录", type: "local" },
+      tracks: local.tracks
+    };
+  }
+
+  return {
+    ...(await loadLibrary()),
+    fallbackReason: "未配置 LOCAL_MUSIC_DIR，当前队列只能使用导入的歌单元数据"
+  };
+}
+
 async function loadState() {
   return readJsonFile(join(dataDir, "state.json"));
 }
@@ -248,7 +263,7 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/plan/today") {
-      const library = await loadLibrary();
+      const library = await loadPlanningLibrary();
       const state = await loadState();
       sendJson(response, 200, await planWithAiOrLocal("今晚想听安静一点", library, state));
       return;
@@ -262,7 +277,7 @@ const server = createServer(async (request, response) => {
         return;
       }
 
-      const library = await loadLibrary();
+      const library = await loadPlanningLibrary();
       const state = await loadState();
       const plan = await planWithAiOrLocal(input, library, state);
 

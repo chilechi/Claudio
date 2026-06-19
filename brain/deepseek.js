@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { parseAiPlan } from "./plan-schema.js";
 
 export async function callDeepSeek({ config, input, library }) {
   if (!config.deepseekApiKey) return null;
@@ -50,5 +51,5 @@ export async function callDeepSeek({ config, input, library }) {
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content || "{}";
-  return JSON.parse(content);
+  return parseAiPlan(content);
 }
