@@ -1,29 +1,4 @@
-const tracks = [
-  {
-    title: "雨虹",
-    artist: "曹方",
-    album: "WanderLust",
-    duration: "03:55"
-  },
-  {
-    title: "一日 (The Day You Left Me)",
-    artist: "丁世光",
-    album: "神经志",
-    duration: "05:08"
-  },
-  {
-    title: "偶尔也有风",
-    artist: "吴炳文",
-    album: "偶尔也有风",
-    duration: "02:50"
-  },
-  {
-    title: "慢慢喜欢你 (Live at EasON AIR)",
-    artist: "陈奕迅",
-    album: "EasON AIR",
-    duration: "04:19"
-  }
-];
+let tracks = [];
 
 let currentIndex = 0;
 let playing = false;
@@ -52,6 +27,7 @@ function escapeHtml(value) {
 
 function render() {
   const track = tracks[currentIndex];
+  if (!track) return;
   els.trackTitle.textContent = track.title;
   els.trackArtist.textContent = `${track.artist} · ${track.album}`;
   els.coverInitial.textContent = track.artist.slice(0, 1).toUpperCase();
@@ -129,3 +105,15 @@ els.form.addEventListener("submit", (event) => {
 });
 
 render();
+
+async function boot() {
+  const response = await fetch("/api/library");
+  const library = await response.json();
+  tracks = library.tracks.slice(0, 5);
+  render();
+}
+
+boot().catch((error) => {
+  els.reply.textContent = "Claudio 没能读到歌单。先保持安静。";
+  console.error(error);
+});

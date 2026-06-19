@@ -1,0 +1,113 @@
+{
+  "source": {
+    "name": "网易云音乐",
+    "playlistId": "7637838720",
+    "note": "初始歌库来自用户提供的网易云歌单截图。真实播放地址后续通过适配器接入。"
+  },
+  "tracks": [
+    {
+      "id": "netease-01",
+      "title": "慢慢喜欢你 (Live at EasON AIR)",
+      "artist": "陈奕迅",
+      "album": "EasON AIR",
+      "duration": "04:19",
+      "tags": ["live", "night", "warm", "mandopop", "gentle"]
+    },
+    {
+      "id": "netease-02",
+      "title": "雨虹",
+      "artist": "曹方",
+      "album": "WanderLust",
+      "duration": "03:55",
+      "tags": ["rain", "indie", "soft", "night", "female"]
+    },
+    {
+      "id": "netease-03",
+      "title": "我有",
+      "artist": "曾淑勤",
+      "album": "我有",
+      "duration": "04:16",
+      "tags": ["soft", "old-soul", "quiet", "female"]
+    },
+    {
+      "id": "netease-04",
+      "title": "那些你很冒险的梦 (JJ20版)",
+      "artist": "林俊杰",
+      "album": "那些你很冒险的梦 (JJ20版)",
+      "duration": "04:47",
+      "tags": ["emo", "ballad", "male", "memory"]
+    },
+    {
+      "id": "netease-05",
+      "title": "每一面都美",
+      "artist": "陶喆",
+      "album": "太美丽",
+      "duration": "04:30",
+      "tags": ["groove", "rnb", "coding", "light"]
+    },
+    {
+      "id": "netease-06",
+      "title": "情歌 (Live)",
+      "artist": "范本桐",
+      "album": "2022中国好声音 第5期",
+      "duration": "03:42",
+      "tags": ["live", "ballad", "emo", "vocal"]
+    },
+    {
+      "id": "netease-07",
+      "title": "困在你的雨季",
+      "artist": "唐俗救世Vulgar Savior",
+      "album": "困在你的雨季",
+      "duration": "04:32",
+      "tags": ["rain", "emo", "indie", "night"]
+    },
+    {
+      "id": "netease-08",
+      "title": "南柯 (dating on the pillow)",
+      "artist": "就是哈比",
+      "album": "就是哈比",
+      "duration": "02:41",
+      "tags": ["dream", "soft", "bedtime", "indie"]
+    },
+    {
+      "id": "netease-09",
+      "title": "一日 (The Day You Left Me)",
+      "artist": "丁世光",
+      "album": "神经志",
+      "duration": "05:08",
+      "tags": ["rnb", "coding", "night", "male", "quiet-groove"]
+    },
+    {
+      "id": "netease-10",
+      "title": "吃掉我",
+      "artist": "金玟岐",
+      "album": "不够好的我",
+      "duration": "04:00",
+      "tags": ["female", "emo", "soft", "mandopop"]
+    },
+    {
+      "id": "netease-11",
+      "title": "我只能离开（陷在这漩涡之间）",
+      "artist": "颜人中",
+      "album": "初恋那件小事 电视剧原声带",
+      "duration": "03:50",
+      "tags": ["ballad", "male", "emo", "drama"]
+    },
+    {
+      "id": "netease-12",
+      "title": "与海无关",
+      "artist": "告五人",
+      "album": "运气来得若有似无",
+      "duration": "04:05",
+      "tags": ["band", "indie", "night", "wind"]
+    },
+    {
+      "id": "netease-13",
+      "title": "偶尔也有风",
+      "artist": "吴炳文",
+      "album": "偶尔也有风",
+      "duration": "02:50",
+      "tags": ["wind", "quiet", "bedtime", "soft"]
+    }
+  ]
+}

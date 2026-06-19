@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
+const dataDir = join(rootDir, "data");
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -46,6 +47,10 @@ function sendJson(response, status, data) {
   response.end(JSON.stringify(data));
 }
 
+async function readJsonFile(filePath) {
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
 function safeStaticPath(urlPath) {
   const decoded = decodeURIComponent(urlPath === "/" ? "/index.html" : urlPath);
   const normalized = normalize(decoded).replace(/^(\.\.[/\\])+/, "");
@@ -83,6 +88,11 @@ const server = createServer(async (request, response) => {
         name: "Claudio",
         version: "0.1.0"
       });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/library") {
+      sendJson(response, 200, await readJsonFile(join(dataDir, "library.json")));
       return;
     }
 
