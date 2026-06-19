@@ -18,6 +18,7 @@ const els = {
   mic: document.querySelector("#micBtn"),
   mode: document.querySelector("#modePill"),
   voice: document.querySelector("#voiceToggle"),
+  settingsSummary: document.querySelector("#settingsSummary"),
   providerList: document.querySelector("#providerList"),
   routineSegments: document.querySelector("#routineSegments"),
   tasteTags: document.querySelector("#tasteTags"),
@@ -300,17 +301,27 @@ async function boot() {
 }
 
 async function loadProviderStatus() {
-  const response = await fetch("/api/config/status");
-  const { providers } = await response.json();
+  const response = await fetch("/api/settings/diagnostics");
+  const diagnostics = await response.json();
+  const providers = diagnostics.providers || [];
+
+  els.settingsSummary.innerHTML = `
+    <span>ready ${diagnostics.summary?.ready || 0}</span>
+    <span>fallback ${diagnostics.summary?.fallback || 0}</span>
+    <span>missing ${diagnostics.summary?.missing || 0}</span>
+    <span>${escapeHtml(diagnostics.secretPolicy || "不展示密钥原文")}</span>
+  `;
   els.providerList.innerHTML = "";
 
   for (const provider of providers) {
     const item = document.createElement("article");
     item.className = `provider-item ${provider.state}`;
+    const envVars = (provider.envVars || []).join(" / ");
     item.innerHTML = `
       <strong>${escapeHtml(provider.label)}</strong>
       <span>${escapeHtml(provider.state)}</span>
       <p>${escapeHtml(provider.reason || "已配置")}</p>
+      <small class="provider-env">${escapeHtml(envVars || "无需配置")}</small>
     `;
     els.providerList.appendChild(item);
   }
