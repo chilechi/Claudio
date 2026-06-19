@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { buildPlan } from "./brain/recommender.js";
 import { callDeepSeek } from "./brain/deepseek.js";
 import { contentTypeForTrack, resolveLocalTrack, scanLocalMusic, streamLocalTrack } from "./music/local-music-provider.js";
+import { fetchNeteasePlaylist, importNeteasePlaylistToDb } from "./music/netease-provider.js";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
@@ -47,6 +48,7 @@ const config = {
   localMusicDir: process.env.LOCAL_MUSIC_DIR || "",
   neteasePlaylistId: process.env.NETEASE_PLAYLIST_ID || "",
   neteaseCookie: process.env.NETEASE_COOKIE || "",
+  neteaseApiBaseUrl: process.env.NETEASE_API_BASE_URL || "",
   ttsProvider: process.env.TTS_PROVIDER || "",
   asrProvider: process.env.ASR_PROVIDER || "",
   openWeatherApiKey: process.env.OPENWEATHER_API_KEY || "",
@@ -196,6 +198,31 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/music/local/scan") {
       sendJson(response, 200, await scanLocalMusic(config.localMusicDir));
+      return;
+    }
+
+    const neteaseImportMatch = url.pathname.match(/^\/api\/music\/netease\/playlists\/([^/]+)\/import$/);
+    if (request.method === "POST" && neteaseImportMatch) {
+      const playlistId = decodeURIComponent(neteaseImportMatch[1]);
+      const result = await fetchNeteasePlaylist({
+        playlistId,
+        apiBaseUrl: config.neteaseApiBaseUrl,
+        cookie: config.neteaseCookie
+      });
+      let importResult = { imported: 0 };
+      if (result.configured && result.tracks.length) {
+        importResult = importNeteasePlaylistToDb(result);
+      }
+      sendJson(response, 200, { ...result, ...importResult });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/music/netease/status") {
+      sendJson(response, 200, {
+        configured: Boolean(config.neteasePlaylistId),
+        reason: config.neteasePlaylistId ? undefined : "缺少 NETEASE_PLAYLIST_ID",
+        playlistId: config.neteasePlaylistId || null
+      });
       return;
     }
 
