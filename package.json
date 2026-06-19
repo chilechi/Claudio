@@ -12,7 +12,9 @@
     "build": "npm run build:server && npm run build:web",
     "build:server": "tsc -p apps/server/tsconfig.json",
     "build:web": "vite build apps/web",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:init": "node scripts/init-db.js",
+    "db:import-v1": "node scripts/import-v1-data.js"
   },
   "keywords": [
     "ai-radio",
