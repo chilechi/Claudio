@@ -1,0 +1,20 @@
+{
+  "name": "claudio",
+  "version": "0.1.0",
+  "description": "电脑端本地个人 AI 电台",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "ai-radio",
+    "deepseek",
+    "netease-cloud-music"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}
