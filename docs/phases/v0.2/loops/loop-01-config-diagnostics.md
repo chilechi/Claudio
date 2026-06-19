@@ -7,7 +7,7 @@
 - 用 Zod 校验 `.env`。
 - 后端提供 `/api/config/status`。
 - 前端显示 provider 配置状态。
-- 缺配置时同步维护 `docs/v0.2-missing-inputs.md`。
+- 缺配置时同步维护 `docs/phases/v0.2/missing-inputs.md`。
 
 产物：
 

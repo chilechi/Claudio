@@ -132,7 +132,7 @@ function providerStatus(id, label, configured, reason, fallbackState, envVars = 
     state: configured ? "ready" : fallbackState || "missing",
     reason: configured ? undefined : reason,
     envVars,
-    docs: "docs/v0.2-missing-inputs.md"
+    docs: "docs/phases/v0.2/missing-inputs.md"
   };
 }
 
@@ -228,7 +228,7 @@ const server = createServer(async (request, response) => {
           fallback: providers.filter((provider) => provider.state === "fallback").length,
           missing: providers.filter((provider) => provider.state === "missing").length
         },
-        docs: "docs/v0.2-missing-inputs.md",
+        docs: "docs/phases/v0.2/missing-inputs.md",
         secretPolicy: "API 只返回需要配置的变量名，不返回任何 .env 原文或密钥值。"
       });
       return;

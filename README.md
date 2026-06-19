@@ -90,22 +90,22 @@ Invoke-RestMethod http://localhost:8080/api/chat -Method Post -ContentType "appl
 ## 数据文件
 
 - `data/library.json`：初始歌库
-- `data/taste.md`：口味档案
-- `data/routines.md`：场景规则
 - `data/state.json`：本地状态记忆
+- `docs/phases/v0.1/reference/taste.md`：v0.1 口味档案
+- `docs/phases/v0.1/reference/routines.md`：v0.1 场景规则
 
 ## 开发清单
 
 Loop Engine 入口：
 
 ```text
-docs/loop-engine-checklist.md
+docs/phases/v0.1/checklist.md
 ```
 
 每个 Loop 的独立任务清单在：
 
 ```text
-docs/loops/
+docs/phases/v0.1/loops/
 ```
 
 ## 常见问题

@@ -11,8 +11,8 @@
 产物：
 
 - `data/library.json`
-- `data/taste.md`
-- `data/routines.md`
+- `docs/phases/v0.1/reference/taste.md`
+- `docs/phases/v0.1/reference/routines.md`
 
 初始歌曲：
 

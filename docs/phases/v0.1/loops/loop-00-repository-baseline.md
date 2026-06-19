@@ -13,7 +13,7 @@
 - `.gitignore`
 - `README.md`
 - `.env.example`
-- `docs/loop-engine-checklist.md`
+- `docs/phases/v0.1/checklist.md`
 
 配置：
 

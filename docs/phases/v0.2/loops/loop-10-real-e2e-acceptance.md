@@ -12,13 +12,13 @@
 
 产物：
 
-- `docs/validation/v0.2-real-e2e.md`
+- `docs/phases/v0.2/validation/v0.2-real-e2e.md`
 - 必要修复提交
 - 可选标签 `v0.2.0`
 
 配置：
 
-- 按 `docs/v0.2-missing-inputs.md` 提供。
+- 按 `docs/phases/v0.2/missing-inputs.md` 提供。
 
 测试：
 

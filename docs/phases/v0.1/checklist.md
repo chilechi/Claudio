@@ -65,7 +65,7 @@ Claudio 的语言风格：
 后续可以直接开 goal。执行时先读本入口，再按上面的链接逐个读取 Loop 文件：
 
 ```text
-按照 D:\workspace\Claudio\docs\loop-engine-checklist.md 自动完成 Claudio。每个 Loop 的具体清单在 docs/loops/ 下，逐个读取并执行。
+按照 D:\workspace\Claudio\docs\phases\v0.1\checklist.md 自动完成 Claudio。每个 Loop 的具体清单在 docs/phases/v0.1/loops/ 下，逐个读取并执行。
 每个 Loop 按计划、改代码、配置、修复、测试、验收、commit、push GitHub 的闭环执行。
 每个 Loop 完成后继续下一个，直到 Loop 9 验收完成。
 ```
