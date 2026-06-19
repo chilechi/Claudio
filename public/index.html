@@ -4,11 +4,107 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Claudio</title>
+    <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <main>
-      <h1>Claudio</h1>
-      <p>本地个人 AI 电台正在启动。</p>
+    <main class="shell">
+      <header class="topbar" aria-label="Claudio 状态">
+        <div>
+          <p class="eyebrow">Personal AI Radio</p>
+          <h1>Claudio</h1>
+        </div>
+        <div class="status-strip" aria-label="运行状态">
+          <span id="providerPill">local brain</span>
+          <span id="modePill">night</span>
+          <span>NetEase taste</span>
+        </div>
+      </header>
+
+      <section class="workspace" aria-label="电台控制台">
+        <aside class="panel player-panel">
+          <p class="panel-label">PLAYER</p>
+          <div class="cover" aria-hidden="true">
+            <span id="coverInitial">C</span>
+          </div>
+          <p class="now-label">Now Playing</p>
+          <h2 id="trackTitle">雨虹</h2>
+          <p id="trackArtist" class="muted">曹方 · WanderLust</p>
+
+          <div class="meter" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+
+          <div class="controls" aria-label="播放器控制">
+            <button id="prevBtn" type="button" title="上一首">‹</button>
+            <button id="playBtn" class="primary" type="button" title="播放/暂停">▶</button>
+            <button id="nextBtn" type="button" title="下一首">›</button>
+            <button id="likeBtn" type="button" title="喜欢">♡</button>
+            <button id="skipBtn" type="button" title="跳过">↷</button>
+          </div>
+
+          <p class="tiny">真实网易云播放后续接入；当前先跑通界面、队列、AI 和语音闭环。</p>
+        </aside>
+
+        <section class="panel chat-panel">
+          <p class="panel-label">CLAUDIO</p>
+          <div class="reply" id="reply">
+            今晚适合慢一点。
+            先从《雨虹》开始，后面接丁世光和吴炳文。
+          </div>
+
+          <form id="chatForm" class="composer">
+            <input
+              id="chatInput"
+              type="text"
+              autocomplete="off"
+              placeholder="比如：今晚想听安静一点 / 适合写代码的 / 有点 emo 但别太丧"
+            />
+            <button type="submit">发送</button>
+          </form>
+
+          <div class="quick-actions" aria-label="快捷场景">
+            <button type="button" data-mode="night">夜晚</button>
+            <button type="button" data-mode="coding">写代码</button>
+            <button type="button" data-mode="emo">Emo</button>
+            <button type="button" data-mode="bedtime">睡前</button>
+          </div>
+        </section>
+
+        <aside class="panel queue-panel">
+          <p class="panel-label">QUEUE</p>
+          <ol id="queue" class="queue"></ol>
+        </aside>
+      </section>
+
+      <section class="lower-grid" aria-label="今日计划和设置">
+        <div class="panel">
+          <p class="panel-label">TODAY PLAN</p>
+          <p id="reason" class="reason">偏夜晚和雨天质感，情绪在，但不会太重。</p>
+        </div>
+        <div class="panel">
+          <p class="panel-label">TASTE</p>
+          <div class="tags">
+            <span>华语流行</span>
+            <span>雨天</span>
+            <span>夜晚</span>
+            <span>Live</span>
+            <span>轻 R&B</span>
+            <span>温柔克制</span>
+          </div>
+        </div>
+        <div class="panel">
+          <p class="panel-label">VOICE</p>
+          <label class="voice-toggle">
+            <input id="voiceToggle" type="checkbox" checked />
+            <span>朗读 Claudio 的回应</span>
+          </label>
+        </div>
+      </section>
     </main>
+    <script src="/app.js" type="module"></script>
   </body>
 </html>
