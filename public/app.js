@@ -123,6 +123,7 @@ async function sendChat(input) {
   currentIndex = 0;
   playing = true;
   els.mode.textContent = plan.mode;
+  document.querySelector("#providerPill").textContent = `${plan.aiProvider || "local"} brain`;
   els.reply.textContent = plan.reply;
   els.reason.textContent = plan.reason;
   render();
@@ -136,6 +137,7 @@ async function boot() {
   const plan = await planResponse.json();
   queue = plan.queue;
   els.mode.textContent = plan.mode;
+  document.querySelector("#providerPill").textContent = `${plan.aiProvider || "local"} brain`;
   els.reply.textContent = plan.reply;
   els.reason.textContent = plan.reason;
   render();

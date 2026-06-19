@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildPlan } from "./brain/recommender.js";
+import { callDeepSeek } from "./brain/deepseek.js";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
@@ -37,7 +38,11 @@ async function loadEnv() {
 await loadEnv();
 
 const config = {
-  port: Number(process.env.PORT || 8080)
+  port: Number(process.env.PORT || 8080),
+  aiProvider: process.env.AI_PROVIDER || "local",
+  deepseekApiKey: process.env.DEEPSEEK_API_KEY || "",
+  deepseekModel: process.env.DEEPSEEK_MODEL || "deepseek-chat",
+  deepseekBaseUrl: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com"
 };
 
 function sendJson(response, status, data) {
@@ -61,6 +66,34 @@ async function readBody(request) {
 
 async function loadLibrary() {
   return readJsonFile(join(dataDir, "library.json"));
+}
+
+async function planWithAiOrLocal(input, library) {
+  if (config.aiProvider === "deepseek" && config.deepseekApiKey) {
+    try {
+      const aiPlan = await callDeepSeek({ config, input, library });
+      const byId = new Map(library.tracks.map((track) => [track.id, track]));
+      const queue = (aiPlan?.queueIds || []).map((id) => byId.get(id)).filter(Boolean);
+
+      if (queue.length && aiPlan?.reply) {
+        return {
+          mode: aiPlan.mode || "night",
+          queue,
+          reply: aiPlan.reply,
+          reason: aiPlan.reason || "由 DeepSeek 根据当前输入和口味生成。",
+          aiProvider: "deepseek"
+        };
+      }
+    } catch (error) {
+      // AI 失败不能阻塞电台，回退到本地规则脑。
+      console.warn(error.message);
+    }
+  }
+
+  return {
+    ...buildPlan(input, library.tracks),
+    aiProvider: "local"
+  };
 }
 
 function safeStaticPath(urlPath) {
@@ -110,7 +143,7 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/plan/today") {
       const library = await loadLibrary();
-      sendJson(response, 200, buildPlan("今晚想听安静一点", library.tracks));
+      sendJson(response, 200, await planWithAiOrLocal("今晚想听安静一点", library));
       return;
     }
 
@@ -123,7 +156,7 @@ const server = createServer(async (request, response) => {
       }
 
       const library = await loadLibrary();
-      sendJson(response, 200, buildPlan(input, library.tracks));
+      sendJson(response, 200, await planWithAiOrLocal(input, library));
       return;
     }
 
