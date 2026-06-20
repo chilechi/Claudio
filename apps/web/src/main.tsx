@@ -43,6 +43,11 @@ function formatTime(seconds: number) {
   return `${minutes}:${rest}`;
 }
 
+function playbackErrorMessage(error?: unknown) {
+  const detail = error instanceof Error && error.name ? `（${error.name}）` : "";
+  return `当前曲目播放失败${detail}，请检查音频文件或浏览器播放权限。`;
+}
+
 function App() {
   const [library, setLibrary] = useState<ActiveLibrary | null>(null);
   const [state, setState] = useState<State | null>(null);
@@ -91,7 +96,10 @@ function App() {
     if (!audio || !currentTrack?.streamUrl) return;
     const absolute = new URL(currentTrack.streamUrl, window.location.href).href;
     if (audio.src !== absolute) audio.src = absolute;
-    if (playing) audio.play().catch(() => setMessage("当前曲目还没有可播放音频，请先配置 LOCAL_MUSIC_DIR。"));
+    if (playing) audio.play().catch((error) => {
+      setPlaying(false);
+      setMessage(playbackErrorMessage(error));
+    });
   }, [currentTrack?.id, currentTrack?.streamUrl, playing]);
 
   async function boot() {
@@ -140,6 +148,7 @@ function App() {
     event.preventDefault();
     const input = chatInput.trim();
     if (!input) return;
+    const shouldContinue = playing;
     setChatInput("");
     setMessage("Claudio 正在整理这一轮。");
     const nextPlan = await api<QueuePlan>("/api/chat", {
@@ -150,7 +159,7 @@ function App() {
     setPlan(nextPlan);
     setQueue(nextPlan.queue);
     setCurrentIndex(0);
-    setPlaying(Boolean(nextPlan.queue[0]?.streamUrl));
+    setPlaying(shouldContinue && Boolean(nextPlan.queue[0]?.streamUrl));
     setMessage(nextPlan.reason);
     speak(nextPlan.reply);
   }
@@ -179,18 +188,30 @@ function App() {
       setPlaying(false);
     } else {
       sendPlayerEvent("play");
-      audio.play().then(() => setPlaying(true)).catch(() => setMessage("当前曲目还没有可播放音频，请先配置 LOCAL_MUSIC_DIR。"));
+      audio.play().then(() => setPlaying(true)).catch((error) => {
+        setPlaying(false);
+        setMessage(playbackErrorMessage(error));
+      });
     }
   }
 
-  function move(delta: number) {
+  function selectTrack(nextIndex: number, options: { continuePlayback?: boolean; eventType?: string } = {}) {
     if (!activeQueue.length) return;
-    const nextIndex = (currentIndex + delta + activeQueue.length) % activeQueue.length;
-    setCurrentIndex(nextIndex);
-    if (playing && !activeQueue[nextIndex].streamUrl) {
+    const normalizedIndex = (nextIndex + activeQueue.length) % activeQueue.length;
+    const nextTrack = activeQueue[normalizedIndex];
+    const shouldContinue = options.continuePlayback ?? playing;
+    setCurrentIndex(normalizedIndex);
+    if (options.eventType) sendPlayerEvent(options.eventType, nextTrack.id);
+    if (shouldContinue && !nextTrack.streamUrl) {
       setPlaying(false);
       setMessage("切到的曲目没有真实音频，已保持安静。");
+      return;
     }
+    setPlaying(shouldContinue && Boolean(nextTrack.streamUrl));
+  }
+
+  function move(delta: number) {
+    selectTrack(currentIndex + delta);
   }
 
   const sourceHint = library?.fallbackReason || (library ? `当前音乐源：${sourceLabel(library.source)}。` : "音乐源读取中。");
@@ -226,7 +247,7 @@ function App() {
           onPrev={() => move(-1)}
           onNext={() => move(1)}
           onLike={() => sendPlayerEvent("like")}
-          onSkip={() => { sendPlayerEvent("skip"); move(1); }}
+          onSkip={() => { sendPlayerEvent("skip"); selectTrack(currentIndex + 1, { continuePlayback: playing }); }}
           onHide={() => sendPlayerEvent("hide")}
           onProgress={(value) => {
             const audio = audioRef.current;
@@ -250,7 +271,7 @@ function App() {
           setVoiceEnabled={setVoiceEnabled}
         />
 
-        <QueuePanel queue={activeQueue} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} queueCount={queueCount} />
+        <QueuePanel queue={activeQueue} currentIndex={currentIndex} selectTrack={(index) => selectTrack(index)} queueCount={queueCount} />
       </section>
 
       <section className="lower-grid" aria-label="今日计划和设置">
@@ -278,6 +299,8 @@ function App() {
         }}
         onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
         onEnded={() => move(1)}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
       />
     </main>
   );
@@ -360,14 +383,14 @@ function ChatPanel(props: {
   );
 }
 
-function QueuePanel({ queue, currentIndex, setCurrentIndex, queueCount }: { queue: Track[]; currentIndex: number; setCurrentIndex: (index: number) => void; queueCount: number }) {
+function QueuePanel({ queue, currentIndex, selectTrack, queueCount }: { queue: Track[]; currentIndex: number; selectTrack: (index: number) => void; queueCount: number }) {
   return (
     <aside className="panel queue-panel">
       <p className="panel-label">队列</p>
       <p className="queue-count">{queueCount} 首</p>
       <ol className="queue">
         {queue.map((track, index) => (
-          <li key={track.id} className={index === currentIndex ? "active" : ""} onClick={() => setCurrentIndex(index)}>
+          <li key={track.id} className={index === currentIndex ? "active" : ""} onClick={() => selectTrack(index)}>
             <span className="queue-index">{String(index + 1).padStart(2, "0")}</span>
             <div>
               <p className="queue-title">{track.title}</p>

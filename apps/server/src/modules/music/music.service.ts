@@ -67,11 +67,12 @@ export class MusicService {
     return this.localMusic.resolveTrack(this.config.env.LOCAL_MUSIC_DIR, trackId);
   }
 
-  streamLocalTrack(track: Awaited<ReturnType<LocalMusicProvider["resolveTrack"]>>) {
+  async streamLocalTrack(track: Awaited<ReturnType<LocalMusicProvider["resolveTrack"]>>, options?: { start?: number; end?: number }) {
     if (!track) return null;
     return {
-      stream: this.localMusic.stream(track),
-      contentType: this.localMusic.contentType(track)
+      stream: this.localMusic.stream(track, options),
+      contentType: this.localMusic.contentType(track),
+      size: await this.localMusic.size(track)
     };
   }
 

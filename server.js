@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -341,8 +341,39 @@ const server = createServer(async (request, response) => {
         return;
       }
 
+      const { size } = await stat(track.path);
+      const range = request.headers.range;
+      const contentType = contentTypeForTrack(track);
+      if (range) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+        if (!match) {
+          response.writeHead(416, { "Content-Range": `bytes */${size}` });
+          response.end();
+          return;
+        }
+        const start = match[1] ? Number(match[1]) : 0;
+        const end = match[2] ? Number(match[2]) : size - 1;
+        if (!Number.isInteger(start) || !Number.isInteger(end) || start > end || start >= size) {
+          response.writeHead(416, { "Content-Range": `bytes */${size}` });
+          response.end();
+          return;
+        }
+        const safeEnd = Math.min(end, size - 1);
+        response.writeHead(206, {
+          "Content-Type": contentType,
+          "Content-Length": String(safeEnd - start + 1),
+          "Content-Range": `bytes ${start}-${safeEnd}/${size}`,
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store"
+        });
+        streamLocalTrack(track, { start, end: safeEnd }).pipe(response);
+        return;
+      }
+
       response.writeHead(200, {
-        "Content-Type": contentTypeForTrack(track),
+        "Content-Type": contentType,
+        "Content-Length": String(size),
+        "Accept-Ranges": "bytes",
         "Cache-Control": "no-store"
       });
       streamLocalTrack(track).pipe(response);
@@ -411,6 +442,10 @@ const server = createServer(async (request, response) => {
       }
       if (body.type === "skip" && trackId && !state.skipped.includes(trackId)) {
         state.skipped.push(trackId);
+      }
+      if (body.type === "hide" && trackId) {
+        state.hidden = state.hidden || [];
+        if (!state.hidden.includes(trackId)) state.hidden.push(trackId);
       }
       if (body.type === "play" && trackId) {
         state.currentTrackId = trackId;

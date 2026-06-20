@@ -46,8 +46,12 @@ export class LocalMusicProvider {
     return scan.tracks.find((track) => track.id === trackId) || null;
   }
 
-  stream(track: LocalTrack) {
-    return createReadStream(track.path);
+  stream(track: LocalTrack, options?: { start?: number; end?: number }) {
+    return createReadStream(track.path, options);
+  }
+
+  async size(track: LocalTrack) {
+    return (await stat(track.path)).size;
   }
 
   contentType(track: LocalTrack) {

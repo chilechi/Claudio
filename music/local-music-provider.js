@@ -38,8 +38,8 @@ export async function resolveLocalTrack(rootDir, trackId) {
   return scan.tracks.find((track) => track.id === trackId) || null;
 }
 
-export function streamLocalTrack(track) {
-  return createReadStream(track.path);
+export function streamLocalTrack(track, options = undefined) {
+  return createReadStream(track.path, options);
 }
 
 export function contentTypeForTrack(track) {

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Res } from "@nestjs/common";
-import type { FastifyReply } from "fastify";
+import { Body, Controller, Get, HttpCode, Param, Post, Req, Res } from "@nestjs/common";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { StateService } from "../state/state.service.js";
 import { MusicService } from "./music.service.js";
 
@@ -32,15 +32,50 @@ export class MusicController {
   }
 
   @Get("/api/tracks/:trackId/stream")
-  async streamTrack(@Param("trackId") trackId: string, @Res() reply: FastifyReply) {
+  async streamTrack(@Param("trackId") trackId: string, @Req() request: FastifyRequest, @Res() reply: FastifyReply) {
     const track = await this.music.resolveLocalTrack(trackId);
-    const stream = this.music.streamLocalTrack(track);
+    const range = request.headers.range;
+    if (range && track) {
+      const full = await this.music.streamLocalTrack(track);
+      if (!full) {
+        reply.code(404).send({ error: "Track not found or LOCAL_MUSIC_DIR is not configured" });
+        return;
+      }
+      const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+      if (!match) {
+        reply.header("Content-Range", `bytes */${full.size}`).code(416).send();
+        return;
+      }
+      const start = match[1] ? Number(match[1]) : 0;
+      const end = match[2] ? Number(match[2]) : full.size - 1;
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start > end || start >= full.size) {
+        reply.header("Content-Range", `bytes */${full.size}`).code(416).send();
+        return;
+      }
+      const safeEnd = Math.min(end, full.size - 1);
+      const partial = await this.music.streamLocalTrack(track, { start, end: safeEnd });
+      if (!partial) {
+        reply.code(404).send({ error: "Track not found or LOCAL_MUSIC_DIR is not configured" });
+        return;
+      }
+      reply.header("Content-Type", partial.contentType);
+      reply.header("Content-Length", String(safeEnd - start + 1));
+      reply.header("Content-Range", `bytes ${start}-${safeEnd}/${partial.size}`);
+      reply.header("Accept-Ranges", "bytes");
+      reply.header("Cache-Control", "no-store");
+      reply.code(206).send(partial.stream);
+      return;
+    }
+
+    const stream = await this.music.streamLocalTrack(track);
     if (!stream) {
       reply.code(404).send({ error: "Track not found or LOCAL_MUSIC_DIR is not configured" });
       return;
     }
 
     reply.header("Content-Type", stream.contentType);
+    reply.header("Content-Length", String(stream.size));
+    reply.header("Accept-Ranges", "bytes");
     reply.header("Cache-Control", "no-store");
     reply.send(stream.stream);
   }
