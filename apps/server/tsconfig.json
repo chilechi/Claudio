@@ -2,6 +2,8 @@
   "compilerOptions": {
     "composite": true,
     "declaration": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "dist",

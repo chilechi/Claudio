@@ -198,3 +198,24 @@ npm run dev:web
 - 天气：`WEATHER_PROVIDER`、`OPENWEATHER_API_KEY`、`WEATHER_CITY`
 - 日历/日程：`CALENDAR_PROVIDER`
 - 家庭音响/UPnP：`UPNP_ENABLED`、`UPNP_DEVICE_NAME`
+
+## v0.3 Loop 03 本地依赖运行缺口
+
+状态：待用户后续清理/重装依赖
+
+Loop 03 已安装 NestJS/Fastify 相关依赖，并将 `toad-cache` 钉到 `3.7.0` 以避开 `3.7.1` 缺少 CJS 入口的问题。当前本机 `node_modules` 仍存在 `fast-json-stringify` 包内容不完整的问题：`package.json` 指向 `index.js`，但实际目录缺少该文件，导致新 Nest 服务运行时报错。
+
+建议后续在网络稳定时执行一次干净重装：
+
+```powershell
+Remove-Item node_modules -Recurse -Force
+npm install
+npm run build
+npm run start:server
+```
+
+在该缺口修复前：
+
+- `npm run build` 可以通过。
+- 旧 `npm start` / `server.js` fallback 仍可用。
+- 新 `npm run start:server` 可能因本地依赖文件缺失无法启动。
