@@ -102,6 +102,7 @@ export const stateSchema = z.object({
   queue: z.array(z.string().min(1)),
   liked: z.array(z.string().min(1)),
   skipped: z.array(z.string().min(1)),
+  hidden: z.array(z.string().min(1)).optional(),
   recentPrompts: z.array(z.object({
     input: z.string(),
     reply: z.string(),

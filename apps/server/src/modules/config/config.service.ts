@@ -36,6 +36,7 @@ export type ServerConfig = z.infer<typeof envSchema>;
 @Injectable()
 export class ConfigService {
   readonly env: ServerConfig;
+  readonly rootDir = rootDir;
 
   constructor() {
     this.env = envSchema.parse({ ...readLocalEnv(), ...process.env });

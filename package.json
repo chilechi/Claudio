@@ -14,7 +14,7 @@
     "build": "npm run build:core && npm run build:server && npm run build:web",
     "build:shared": "tsc -p packages/shared/tsconfig.json",
     "build:core": "npm run build:shared && tsc -p packages/core/tsconfig.json",
-    "build:server": "npm run build:shared && tsc -p apps/server/tsconfig.json",
+    "build:server": "npm run build:core && tsc -p apps/server/tsconfig.json",
     "build:web": "vite build apps/web",
     "test:core": "npm run build:core && node scripts/test-core.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
