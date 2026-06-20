@@ -137,7 +137,6 @@ function App() {
     ]);
     if (todayPlan.status === "fulfilled") {
       setPlan(todayPlan.value);
-      if (!restoredQueue.length && todayPlan.value.queue.length && !userInteractedRef.current) setQueue(todayPlan.value.queue);
     } else {
       setMessage("今日计划暂时没有生成，已先使用真实歌库。");
       setErrors((items) => [...items, `今日计划失败：${todayPlan.reason instanceof Error ? todayPlan.reason.message : "未知错误"}`]);
@@ -213,8 +212,10 @@ function App() {
       audio.pause();
       setPlaying(false);
     } else {
-      sendPlayerEvent("play");
-      audio.play().then(() => setPlaying(true)).catch((error) => {
+      audio.play().then(() => {
+        setPlaying(true);
+        sendPlayerEvent("play");
+      }).catch((error) => {
         setPlaying(false);
         setMessage(playbackErrorMessage(error));
       });
