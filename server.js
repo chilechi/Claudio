@@ -90,7 +90,7 @@ async function readBody(request) {
 
 async function loadLibrary() {
   const library = await readJsonFile(join(dataDir, "library.json"));
-  return normalizeLibrary(library, "imported");
+  return normalizeLibrary(library, "netease");
 }
 
 function normalizeLibrary(library, defaultSource = "imported") {
