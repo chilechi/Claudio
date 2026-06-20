@@ -69,6 +69,8 @@ function App() {
   const [duration, setDuration] = useState(0);
   const [errors, setErrors] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playingRef = useRef(false);
+  const userInteractedRef = useRef(false);
 
   const activeQueue = queue.length ? queue : library?.tracks || [];
   const currentTrack = activeQueue[currentIndex];
@@ -76,6 +78,10 @@ function App() {
   useEffect(() => {
     document.body.classList.toggle("light", light);
   }, [light]);
+
+  useEffect(() => {
+    playingRef.current = playing;
+  }, [playing]);
 
   useEffect(() => {
     const update = () => {
@@ -97,12 +103,16 @@ function App() {
     const audio = audioRef.current;
     if (!audio || !currentTrack?.streamUrl) return;
     const absolute = new URL(currentTrack.streamUrl, window.location.href).href;
-    if (audio.src !== absolute) audio.src = absolute;
-    if (playing) audio.play().catch((error) => {
+    if (audio.src !== absolute) {
+      audio.src = absolute;
+      setCurrentTime(0);
+      setProgress(0);
+    }
+    if (playingRef.current) audio.play().catch((error) => {
       setPlaying(false);
       setMessage(playbackErrorMessage(error));
     });
-  }, [currentTrack?.id, currentTrack?.streamUrl, playing]);
+  }, [currentTrack?.id, currentTrack?.streamUrl]);
 
   async function boot() {
     const [activeLibrary, savedState] = await Promise.all([
@@ -127,7 +137,7 @@ function App() {
     ]);
     if (todayPlan.status === "fulfilled") {
       setPlan(todayPlan.value);
-      if (!restoredQueue.length && todayPlan.value.queue.length) setQueue(todayPlan.value.queue);
+      if (!restoredQueue.length && todayPlan.value.queue.length && !userInteractedRef.current) setQueue(todayPlan.value.queue);
     } else {
       setMessage("今日计划暂时没有生成，已先使用真实歌库。");
       setErrors((items) => [...items, `今日计划失败：${todayPlan.reason instanceof Error ? todayPlan.reason.message : "未知错误"}`]);
@@ -154,6 +164,7 @@ function App() {
     event.preventDefault();
     const input = chatInput.trim();
     if (!input) return;
+    userInteractedRef.current = true;
     const shouldContinue = playing;
     setChatInput("");
     setMessage("Claudio 正在整理这一轮。");
@@ -187,6 +198,7 @@ function App() {
   }
 
   function togglePlay() {
+    userInteractedRef.current = true;
     if (!currentTrack) return;
     if (!currentTrack.streamUrl) {
       setPlaying(false);
@@ -195,6 +207,8 @@ function App() {
     }
     const audio = audioRef.current;
     if (!audio) return;
+    const absolute = new URL(currentTrack.streamUrl, window.location.href).href;
+    if (audio.src !== absolute) audio.src = absolute;
     if (playing) {
       audio.pause();
       setPlaying(false);
@@ -208,6 +222,7 @@ function App() {
   }
 
   function selectTrack(nextIndex: number, options: { continuePlayback?: boolean; eventType?: string } = {}) {
+    userInteractedRef.current = true;
     if (!activeQueue.length) return;
     const normalizedIndex = (nextIndex + activeQueue.length) % activeQueue.length;
     const nextTrack = activeQueue[normalizedIndex];
@@ -344,7 +359,7 @@ function PlayerPanel(props: {
         <small>{props.playing ? "● 播放中" : "● 待命"}</small>
       </div>
       <div className="cover" aria-hidden="true"><span>{track?.artist?.slice(0, 1).toUpperCase() || "C"}</span></div>
-      <p className="now-label">正在播放</p>
+      <p className="now-label">{props.playing ? "正在播放" : "当前曲目"}</p>
       <h2>{track?.title || "等待歌曲"}</h2>
       <p className="muted">{track ? `${track.artist} · ${track.album || "未知专辑"}` : "还没有队列"}</p>
       <div className="meter" aria-hidden="true"><span /><span /><span /><span /><span /></div>
