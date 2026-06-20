@@ -15,8 +15,9 @@ type RadioPlan = {
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || `请求失败：${path}`);
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) throw new Error(data.error || `请求失败：${path}（${response.status}）`);
   return data as T;
 }
 
@@ -66,6 +67,7 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [errors, setErrors] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const activeQueue = queue.length ? queue : library?.tracks || [];
@@ -128,10 +130,14 @@ function App() {
       if (!restoredQueue.length && todayPlan.value.queue.length) setQueue(todayPlan.value.queue);
     } else {
       setMessage("今日计划暂时没有生成，已先使用真实歌库。");
+      setErrors((items) => [...items, `今日计划失败：${todayPlan.reason instanceof Error ? todayPlan.reason.message : "未知错误"}`]);
     }
     if (radioPlan.status === "fulfilled") setRadio(radioPlan.value);
+    else setErrors((items) => [...items, `电台计划失败：${radioPlan.reason instanceof Error ? radioPlan.reason.message : "未知错误"}`]);
     if (tasteProfile.status === "fulfilled") setTaste(tasteProfile.value);
+    else setErrors((items) => [...items, `口味画像失败：${tasteProfile.reason instanceof Error ? tasteProfile.reason.message : "未知错误"}`]);
     if (settings.status === "fulfilled") setDiagnostics(settings.value);
+    else setErrors((items) => [...items, `配置诊断失败：${settings.reason instanceof Error ? settings.reason.message : "未知错误"}`]);
   }
 
   async function sendPlayerEvent(type: string, trackId = currentTrack?.id) {
@@ -151,17 +157,23 @@ function App() {
     const shouldContinue = playing;
     setChatInput("");
     setMessage("Claudio 正在整理这一轮。");
-    const nextPlan = await api<QueuePlan>("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input })
-    });
-    setPlan(nextPlan);
-    setQueue(nextPlan.queue);
-    setCurrentIndex(0);
-    setPlaying(shouldContinue && Boolean(nextPlan.queue[0]?.streamUrl));
-    setMessage(nextPlan.reason);
-    speak(nextPlan.reply);
+    try {
+      const nextPlan = await api<QueuePlan>("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input })
+      });
+      setPlan(nextPlan);
+      setQueue(nextPlan.queue);
+      setCurrentIndex(0);
+      setPlaying(shouldContinue && Boolean(nextPlan.queue[0]?.streamUrl));
+      setMessage(nextPlan.reason);
+      speak(nextPlan.reply);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "未知错误";
+      setMessage(`Claudio 暂时没有接住：${reason}`);
+      setErrors((items) => [`聊天请求失败：${reason}`, ...items].slice(0, 6));
+    }
   }
 
   function speak(text: string) {
@@ -286,7 +298,7 @@ function App() {
         </div>
       </section>
 
-      <DiagnosticsPanel diagnostics={diagnostics} summary={providerSummary} />
+      <DiagnosticsPanel diagnostics={diagnostics} summary={providerSummary} errors={errors} />
 
       <audio
         ref={audioRef}
@@ -337,21 +349,21 @@ function PlayerPanel(props: {
       <p className="muted">{track ? `${track.artist} · ${track.album || "未知专辑"}` : "还没有队列"}</p>
       <div className="meter" aria-hidden="true"><span /><span /><span /><span /><span /></div>
       <div className="controls">
-        <button type="button" title="上一首" onClick={props.onPrev}>‹</button>
-        <button className="primary" type="button" title="播放/暂停" onClick={props.onPlay}>{props.playing ? "暂停" : "播放"}</button>
-        <button type="button" title="下一首" onClick={props.onNext}>›</button>
+        <button type="button" title="上一首" onClick={props.onPrev} disabled={!track}>‹</button>
+        <button className="primary" type="button" title="播放/暂停" onClick={props.onPlay} disabled={!track}>{props.playing ? "暂停" : "播放"}</button>
+        <button type="button" title="下一首" onClick={props.onNext} disabled={!track}>›</button>
         <button type="button" title="喜欢" onClick={props.onLike}>♡</button>
         <button type="button" title="跳过" onClick={props.onSkip}>↷</button>
       </div>
       <div className="transport">
         <span>{formatTime(props.currentTime)}</span>
-        <input type="range" min="0" max="1000" value={props.progress} onChange={(event) => props.onProgress(Number(event.target.value))} />
+        <input type="range" min="0" max="1000" value={props.progress} onInput={(event) => props.onProgress(Number(event.currentTarget.value))} onChange={(event) => props.onProgress(Number(event.target.value))} />
         <span>{formatTime(props.duration)}</span>
       </div>
       <div className="utility-controls">
         <button type="button" onClick={props.onHide}>隐藏</button>
         <button type="button" onClick={props.onLike}>收藏</button>
-        <label>音量<input type="range" min="0" max="1" step="0.01" defaultValue="0.8" onChange={(event) => props.onVolume(Number(event.target.value))} /></label>
+        <label>音量<input type="range" min="0" max="1" step="0.01" defaultValue="0.8" onInput={(event) => props.onVolume(Number(event.currentTarget.value))} onChange={(event) => props.onVolume(Number(event.target.value))} /></label>
       </div>
       <p className="tiny">{props.sourceHint}</p>
     </aside>
@@ -399,6 +411,7 @@ function QueuePanel({ queue, currentIndex, selectTrack, queueCount }: { queue: T
           </li>
         ))}
       </ol>
+      {!queue.length ? <p className="empty-note">还没有可用队列。先配置 LOCAL_MUSIC_DIR，或确认网易云歌单元数据已导入。</p> : null}
     </aside>
   );
 }
@@ -433,7 +446,7 @@ function TastePanel({ taste }: { taste: TasteProfileResponse | null }) {
   );
 }
 
-function DiagnosticsPanel({ diagnostics, summary }: { diagnostics: DiagnosticsResponse | null; summary?: DiagnosticsResponse["summary"] }) {
+function DiagnosticsPanel({ diagnostics, summary, errors }: { diagnostics: DiagnosticsResponse | null; summary?: DiagnosticsResponse["summary"]; errors: string[] }) {
   return (
     <section className="panel diagnostics-panel">
       <p className="panel-label">配置诊断</p>
@@ -443,6 +456,12 @@ function DiagnosticsPanel({ diagnostics, summary }: { diagnostics: DiagnosticsRe
         <span>缺少 {summary?.missing || 0}</span>
         <span>{diagnostics?.secretPolicy || "不展示密钥原文"}</span>
       </div>
+      {!diagnostics ? <p className="empty-note">正在读取配置诊断。若长时间没有结果，请检查后端是否启动。</p> : null}
+      {errors.length ? (
+        <div className="error-list" aria-label="当前错误">
+          {errors.map((error) => <p key={error}>{error}</p>)}
+        </div>
+      ) : null}
       <div className="provider-list">
         {(diagnostics?.providers || []).map((provider) => (
           <article className={`provider-item ${provider.state}`} key={provider.id}>

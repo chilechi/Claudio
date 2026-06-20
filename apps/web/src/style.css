@@ -44,6 +44,10 @@ body.light {
 
 button, input { font: inherit; }
 button { color: var(--text); cursor: pointer; }
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 
 .shell {
   width: min(1440px, calc(100vw - 48px));
@@ -299,3 +303,24 @@ h2 { min-height: 68px; margin: 8px 0; font-size: 28px; line-height: 1.2; font-we
 .provider-item.ready { border-color: rgba(120, 214, 163, 0.42); }
 .provider-item.fallback { border-color: rgba(233, 196, 106, 0.48); }
 .provider-item.missing, .provider-item.error { border-color: rgba(233, 130, 109, 0.5); }
+
+.empty-note {
+  margin: 16px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.error-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.error-list p {
+  margin: 0;
+  border: 1px solid rgba(233, 130, 109, 0.5);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: rgba(233, 130, 109, 0.09);
+}

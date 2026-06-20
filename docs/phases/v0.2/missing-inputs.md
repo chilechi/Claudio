@@ -199,6 +199,19 @@ npm run dev:web
 - 日历/日程：`CALENDAR_PROVIDER`
 - 家庭音响/UPnP：`UPNP_ENABLED`、`UPNP_DEVICE_NAME`
 
+## 播放器权限缺口
+
+状态：需要真实浏览器复测
+
+即使 `LOCAL_MUSIC_DIR` 已配置，浏览器仍可能因为媒体播放权限拦截 `audio.play()`，表现为页面提示 `NotAllowedError`。这不是歌库缺失，也不是网易云元数据问题。
+
+排查顺序：
+
+1. 确认当前歌曲有 `streamUrl`。
+2. 确认 `/api/tracks/:id/stream` 返回 `Content-Length`、`Accept-Ranges`，Range 请求返回 `206`。
+3. 在普通浏览器里手动点击播放按钮。
+4. 如果普通浏览器也失败，再检查浏览器站点权限、静音策略和音频文件格式。
+
 ## v0.3 Loop 03 本地依赖运行缺口
 
 状态：待用户后续清理/重装依赖
