@@ -5,6 +5,7 @@ Thumbs.db
 *.log
 coverage/
 dist/
+*.tsbuildinfo
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

@@ -71,12 +71,12 @@ export function buildTasteProfile(tracks = [], state = {}) {
   const topTags = [...tagCounts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh-Hans-CN"))
     .slice(0, 8)
-    .map(([tag, score]) => ({ tag, score }));
+    .map(([tag, count]) => ({ tag, count }));
 
   const topArtists = [...artistCounts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh-Hans-CN"))
     .slice(0, 5)
-    .map(([artist, score]) => ({ artist, score }));
+    .map(([artist, count]) => ({ artist, count }));
 
   return {
     likedCount: liked.size,
@@ -91,7 +91,7 @@ function scoreTrack(track, slot, profile, state = {}) {
   const tags = new Set(track.tags || []);
   const liked = new Set(state.liked || []);
   const skipped = new Set(state.skipped || []);
-  const profileTags = new Map((profile.topTags || []).map((item) => [item.tag, item.score]));
+  const profileTags = new Map((profile.topTags || []).map((item) => [item.tag, item.count ?? item.score ?? 0]));
 
   if (skipped.has(track.id)) return -100;
 

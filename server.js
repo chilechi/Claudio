@@ -89,7 +89,38 @@ async function readBody(request) {
 }
 
 async function loadLibrary() {
-  return readJsonFile(join(dataDir, "library.json"));
+  const library = await readJsonFile(join(dataDir, "library.json"));
+  return normalizeLibrary(library, "imported");
+}
+
+function normalizeLibrary(library, defaultSource = "imported") {
+  const sourceType = normalizeTrackSource(library?.source?.type || defaultSource);
+  return {
+    ...library,
+    source: {
+      ...(library?.source || { name: "Imported Library" }),
+      type: sourceType
+    },
+    tracks: (library?.tracks || []).map((track) => normalizeTrack(track, sourceType))
+  };
+}
+
+function normalizeTrack(track, fallbackSource = "imported") {
+  const source = normalizeTrackSource(track.source || fallbackSource);
+  const duration = typeof track.duration === "number" ? track.duration : undefined;
+  const durationText = typeof track.duration === "string" ? track.duration : track.durationText;
+  return {
+    ...track,
+    duration,
+    durationText: durationText || undefined,
+    source,
+    playable: typeof track.playable === "boolean" ? track.playable : source === "local",
+    tags: Array.isArray(track.tags) ? track.tags : []
+  };
+}
+
+function normalizeTrackSource(value) {
+  return ["local", "netease", "imported"].includes(value) ? value : "imported";
 }
 
 async function loadPlanningLibrary() {

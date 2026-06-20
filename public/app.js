@@ -378,7 +378,7 @@ async function loadTasteProfile() {
 
   for (const item of profile.topTags || []) {
     const tag = document.createElement("span");
-    tag.textContent = `${item.tag} · ${item.score}`;
+    tag.textContent = `${item.tag} · ${item.count ?? item.score ?? 0}`;
     els.tasteTags.appendChild(tag);
   }
 
