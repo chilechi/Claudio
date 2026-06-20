@@ -17,6 +17,7 @@
     "build:server": "npm run build:core && tsc -p apps/server/tsconfig.json",
     "build:web": "vite build --config apps/web/vite.config.ts",
     "test:core": "npm run build:core && node scripts/test-core.mjs",
+    "typecheck:mobile": "tsc -p apps/mobile/tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:init": "node scripts/init-db.js",
     "db:import-v1": "node scripts/import-v1-data.js"
