@@ -212,13 +212,20 @@ npm run dev:web
 3. 在普通浏览器里手动点击播放按钮。
 4. 如果普通浏览器也失败，再检查浏览器站点权限、静音策略和音频文件格式。
 
-## v0.3 Loop 03 本地依赖运行缺口
+## v0.3 本地依赖排查说明
 
-状态：待用户后续清理/重装依赖
+状态：已通过定向重装修复一次
 
-Loop 03 已安装 NestJS/Fastify 相关依赖，并将 `toad-cache` 钉到 `3.7.0` 以避开 `3.7.1` 缺少 CJS 入口的问题。当前本机 `node_modules` 仍存在 `fast-json-stringify` 包内容不完整的问题：`package.json` 指向 `index.js`，但实际目录缺少该文件，导致新 Nest 服务运行时报错。
+Loop 03 曾遇到 `fast-json-stringify` 包内容不完整的问题：`package.json` 指向 `index.js`，但实际目录缺少该文件，导致新 Nest 服务运行时报错。Loop 10 已通过删除损坏的单包目录并重新安装 `fast-json-stringify@6.4.0` 修复。
 
-建议后续在网络稳定时执行一次干净重装：
+如果后续再次出现同类问题，建议执行：
+
+```powershell
+Remove-Item node_modules\fast-json-stringify -Recurse -Force
+npm install fast-json-stringify@6.4.0
+```
+
+如果仍失败，再做干净重装：
 
 ```powershell
 Remove-Item node_modules -Recurse -Force
@@ -226,9 +233,3 @@ npm install
 npm run build
 npm run start:server
 ```
-
-在该缺口修复前：
-
-- `npm run build` 可以通过。
-- 旧 `npm start` / `server.js` fallback 仍可用。
-- 新 `npm run start:server` 可能因本地依赖文件缺失无法启动。

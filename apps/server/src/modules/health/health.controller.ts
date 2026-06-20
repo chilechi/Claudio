@@ -7,7 +7,7 @@ export class HealthController {
     return {
       ok: true,
       name: "Claudio",
-      version: "0.3.0-shell"
+      version: "0.3.0"
     };
   }
 }

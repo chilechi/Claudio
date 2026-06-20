@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { Injectable } from "@nestjs/common";
 import { buildLocalPlan, repairDeepSeekPlan } from "../../../../../packages/core/dist/index.js";
 import { deepSeekPlanSchema, queuePlanSchema } from "../../../../../packages/shared/dist/index.js";
@@ -7,6 +5,7 @@ import type { ActiveLibrary, DeepSeekPlan, QueuePlan, State, Track } from "../..
 import { ConfigService } from "../config/config.service.js";
 import { MusicService } from "../music/music.service.js";
 import { StateService } from "../state/state.service.js";
+import { claudioPersona } from "./persona.js";
 
 @Injectable()
 export class AiService {
@@ -52,7 +51,6 @@ export class AiService {
   }
 
   async callDeepSeek(input: string, tracks: Track[]): Promise<DeepSeekPlan> {
-    const persona = await readFile(join(this.config.rootDir, "brain", "persona.md"), "utf8");
     const body = {
       model: this.config.env.DEEPSEEK_MODEL,
       temperature: 0.7,
@@ -60,7 +58,7 @@ export class AiService {
       messages: [
         {
           role: "system",
-          content: `${persona}\n\n只返回 JSON：{"reply": string, "mode": string, "queueIds": string[], "reason": string}。queueIds 必须来自候选歌曲 id。`
+          content: `${claudioPersona}\n\n只返回 JSON：{"reply": string, "mode": string, "queueIds": string[], "reason": string}。queueIds 必须来自候选歌曲 id。`
         },
         {
           role: "user",

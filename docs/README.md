@@ -23,12 +23,13 @@
 
 ## 运行代码
 
-- `server.js`：当前可直接运行的 v0.2 服务入口。
-- `public/`：当前桌面端页面。
-- `brain/`：AI DJ、本地推荐和结构化计划。
-- `music/`：本地音乐、网易云元数据适配器。
-- `radio/`：时段电台和长期口味。
+- `apps/server/`：NestJS 服务端，默认入口。
+- `apps/web/`：React + Vite 桌面端。
+- `apps/mobile/`：移动端复用入口和 API client。
+- `packages/shared/`：跨端类型和 schema。
+- `packages/core/`：推荐、口味、音乐源选择等纯业务函数。
 - `data/`：本地歌库和运行状态。
 - `db/`：SQLite schema。
 - `scripts/`：数据库初始化和导入脚本。
-- `apps/`、`packages/`：后续 Fastify/React/共享包工程化目录。
+
+v0.3 cutover 后，旧 `server.js`、`public/`、`brain/`、`music/`、`radio/` 已删除，避免 React/Nest 与原生 HTML/Node 入口混用。
