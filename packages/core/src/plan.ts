@@ -9,7 +9,6 @@ export const modeTags = {
 } as const;
 
 export type PlanMode = keyof typeof modeTags;
-
 export type RecommendationState = Pick<State, "liked" | "skipped"> | Partial<Pick<State, "liked" | "skipped">>;
 
 export function inferMode(input = "", hour = 20): PlanMode {
@@ -43,11 +42,7 @@ export function recommendTracks(
     const tagScore = desiredTags.reduce((sum, tag) => sum + (tags.has(tag) ? 2 : 0), 0);
     const likeScore = liked.has(track.id) ? 3 : 0;
     const skipPenalty = skipped.has(track.id) ? 100 : 0;
-    return {
-      track,
-      index,
-      score: tagScore + likeScore - skipPenalty
-    };
+    return { track, index, score: tagScore + likeScore - skipPenalty };
   });
 
   const nonSkipped = scored.filter((item) => !skipped.has(item.track.id));
