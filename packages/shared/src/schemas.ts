@@ -69,6 +69,37 @@ export const chatRequestSchema = z.object({
 
 export const chatResponseSchema = queuePlanSchema;
 
+export const hostNarrationKindSchema = z.enum(["intro", "between-tracks"]);
+
+export const hostNarrationRequestSchema = z.object({
+  trackId: z.string().min(1),
+  previousTrackId: z.string().min(1).optional(),
+  context: z.string().trim().max(500).optional()
+});
+
+export const hostNarrationResponseSchema = z.object({
+  kind: hostNarrationKindSchema,
+  trackId: z.string().min(1),
+  previousTrackId: z.string().min(1).optional(),
+  text: z.string().min(1),
+  source: aiProviderSchema,
+  generatedAt: z.string().min(1)
+});
+
+export const voiceStatusSchema = z.object({
+  provider: z.string().min(1),
+  configured: z.boolean(),
+  state: providerStateSchema,
+  audioSupported: z.boolean(),
+  fallbackProvider: z.string().min(1),
+  reason: z.string().min(1).optional(),
+  envVars: z.array(z.string().min(1))
+});
+
+export const voiceSpeakRequestSchema = z.object({
+  text: z.string().trim().min(1).max(1200)
+});
+
 export const tasteProfileSchema = z.object({
   likedCount: z.number().int().nonnegative(),
   skippedCount: z.number().int().nonnegative(),

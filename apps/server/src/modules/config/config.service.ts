@@ -16,19 +16,24 @@ const envSchema = z.object({
   DEEPSEEK_BASE_URL: z.string().default("https://api.deepseek.com"),
   DEEPSEEK_MODEL: z.string().default("deepseek-chat"),
   FISH_AUDIO_API_KEY: z.string().optional(),
+  FISH_AUDIO_BASE_URL: z.string().default("https://api.fish.audio"),
+  FISH_AUDIO_MODEL: z.string().default("s2-pro"),
   FISH_AUDIO_VOICE_ID: z.string().optional(),
   LOCAL_MUSIC_DIR: z.string().optional(),
   MUSIC_SOURCE: z.enum(["auto", "local", "netease"]).default("auto"),
   NETEASE_API_BASE_URL: z.string().optional(),
   NETEASE_COOKIE: z.string().optional(),
   NETEASE_PLAYLIST_ID: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_TTS_MODEL: z.string().optional(),
   OPENWEATHER_API_KEY: z.string().optional(),
   PORT: z.coerce.number().default(8080),
   TTS_PROVIDER: z.string().optional(),
   UPNP_DEVICE_NAME: z.string().optional(),
   UPNP_ENABLED: z.string().optional(),
   WEATHER_CITY: z.string().optional(),
-  WEATHER_PROVIDER: z.string().optional()
+  WEATHER_PROVIDER: z.string().optional(),
+  WHISPER_API_KEY: z.string().optional()
 });
 
 export type ServerConfig = z.infer<typeof envSchema>;
@@ -60,12 +65,8 @@ export class ConfigService {
         "NETEASE_COOKIE",
         "NETEASE_API_BASE_URL"
       ]),
-      status("tts", "真实 TTS", Boolean(this.env.TTS_PROVIDER), "未选择 TTS_PROVIDER，当前只能使用浏览器语音回退", "fallback", [
-        "TTS_PROVIDER",
-        "FISH_AUDIO_API_KEY",
-        "FISH_AUDIO_VOICE_ID"
-      ]),
-      status("asr", "语音输入", Boolean(this.env.ASR_PROVIDER), "未选择 ASR_PROVIDER，当前只能使用浏览器能力", "fallback", [
+      ttsStatus(this.env),
+      status("asr", "ASR 预留", Boolean(this.env.ASR_PROVIDER), "v0.5 不接收用户声音；后续需要时再配置 ASR_PROVIDER", "fallback", [
         "ASR_PROVIDER",
         "WHISPER_API_KEY"
       ]),
@@ -81,6 +82,38 @@ export class ConfigService {
       ])
     ];
   }
+}
+
+function ttsStatus(env: ServerConfig): ProviderStatus {
+  const provider = (env.TTS_PROVIDER || "").toLowerCase();
+  if (!provider) {
+    return status("tts", "真实 TTS", false, "未选择 TTS_PROVIDER，当前使用浏览器语音回退", "fallback", [
+      "TTS_PROVIDER",
+      "FISH_AUDIO_API_KEY",
+      "FISH_AUDIO_VOICE_ID"
+    ]);
+  }
+
+  if (provider === "fish" || provider === "fish-audio" || provider === "fishaudio") {
+    const ready = Boolean(env.FISH_AUDIO_API_KEY && env.FISH_AUDIO_VOICE_ID);
+    return status("tts", "Fish Audio TTS", ready, "Fish Audio 需要 FISH_AUDIO_API_KEY 和 FISH_AUDIO_VOICE_ID", ready ? undefined : "fallback", [
+      "TTS_PROVIDER",
+      "FISH_AUDIO_API_KEY",
+      "FISH_AUDIO_VOICE_ID",
+      "FISH_AUDIO_MODEL",
+      "FISH_AUDIO_BASE_URL"
+    ]);
+  }
+
+  return {
+    id: "tts",
+    label: "真实 TTS",
+    configured: false,
+    state: "error",
+    reason: `暂不支持的 TTS_PROVIDER：${env.TTS_PROVIDER}`,
+    envVars: ["TTS_PROVIDER"],
+    docs: "docs/phases/v0.5/radio-host-voice-plan.md"
+  };
 }
 
 function readLocalEnv() {

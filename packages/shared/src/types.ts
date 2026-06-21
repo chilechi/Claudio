@@ -7,6 +7,9 @@ import type {
   chatResponseSchema,
   deepSeekPlanSchema,
   diagnosticsResponseSchema,
+  hostNarrationKindSchema,
+  hostNarrationRequestSchema,
+  hostNarrationResponseSchema,
   musicSourceSchema,
   musicSourceSelectionSchema,
   musicSourceTypeSchema,
@@ -18,7 +21,9 @@ import type {
   stateSchema,
   tasteProfileResponseSchema,
   tasteProfileSchema,
-  trackSchema
+  trackSchema,
+  voiceSpeakRequestSchema,
+  voiceStatusSchema
 } from "./schemas.js";
 
 export type ProviderState = z.infer<typeof providerStateSchema>;
@@ -37,6 +42,13 @@ export type DeepSeekPlan = z.infer<typeof deepSeekPlanSchema>;
 
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 export type ChatResponse = z.infer<typeof chatResponseSchema>;
+
+export type HostNarrationKind = z.infer<typeof hostNarrationKindSchema>;
+export type HostNarrationRequest = z.infer<typeof hostNarrationRequestSchema>;
+export type HostNarrationResponse = z.infer<typeof hostNarrationResponseSchema>;
+
+export type VoiceStatus = z.infer<typeof voiceStatusSchema>;
+export type VoiceSpeakRequest = z.infer<typeof voiceSpeakRequestSchema>;
 
 export type TasteProfile = z.infer<typeof tasteProfileSchema>;
 export type TasteProfileResponse = z.infer<typeof tasteProfileResponseSchema>;

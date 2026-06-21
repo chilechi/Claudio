@@ -25,11 +25,30 @@ type LocalScanResponse = {
   };
 };
 
+type HostNarrationResponse = {
+  kind: "intro" | "between-tracks";
+  trackId: string;
+  previousTrackId?: string;
+  text: string;
+  source: "deepseek" | "local";
+  generatedAt: string;
+};
+
+type VoiceStatus = {
+  provider: string;
+  configured: boolean;
+  state: "ready" | "missing" | "fallback" | "error";
+  audioSupported: boolean;
+  fallbackProvider: string;
+  reason?: string;
+  envVars: string[];
+};
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
-  if (!response.ok) throw new Error(data.error || `请求失败：${path}（${response.status}）`);
+  if (!response.ok) throw new Error(data.error || `请求失败：${path}，${response.status}`);
   return data as T;
 }
 
@@ -69,21 +88,24 @@ function App() {
   const [taste, setTaste] = useState<TasteProfileResponse | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
   const [localScan, setLocalScan] = useState<LocalScanResponse | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [message, setMessage] = useState("");
+  const [hostMessage, setHostMessage] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [clock, setClock] = useState("--:--");
   const [light, setLight] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [radioHostEnabled, setRadioHostEnabled] = useState(true);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [errors, setErrors] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const playingRef = useRef(false);
-  const userInteractedRef = useRef(false);
+  const lastNarrationKeyRef = useRef("");
 
   const activeQueue = queue.length ? queue : library?.tracks || [];
   const currentTrack = activeQueue[currentIndex];
@@ -121,10 +143,12 @@ function App() {
       setCurrentTime(0);
       setProgress(0);
     }
-    if (playingRef.current) audio.play().catch((error) => {
-      setPlaying(false);
-      setMessage(playbackErrorMessage(error));
-    });
+    if (playingRef.current) {
+      audio.play().catch((error) => {
+        setPlaying(false);
+        setMessage(playbackErrorMessage(error));
+      });
+    }
   }, [currentTrack?.id, currentTrack?.streamUrl]);
 
   async function boot() {
@@ -142,16 +166,17 @@ function App() {
     const restoredIndex = nextQueue.findIndex((track) => track.id === savedState.currentTrackId);
     setCurrentIndex(restoredIndex >= 0 ? restoredIndex : 0);
 
-    const [todayPlan, radioPlan, tasteProfile, settings, localMusic] = await Promise.allSettled([
+    const [todayPlan, radioPlan, tasteProfile, settings, localMusic, voice] = await Promise.allSettled([
       api<QueuePlan>("/api/plan/today"),
       api<RadioPlan>("/api/radio/today"),
       api<TasteProfileResponse>("/api/taste/profile"),
       api<DiagnosticsResponse>("/api/settings/diagnostics"),
-      api<LocalScanResponse>("/api/music/local/scan")
+      api<LocalScanResponse>("/api/music/local/scan"),
+      api<VoiceStatus>("/api/voice/status")
     ]);
-    if (todayPlan.status === "fulfilled") {
-      setPlan(todayPlan.value);
-    } else {
+
+    if (todayPlan.status === "fulfilled") setPlan(todayPlan.value);
+    else {
       setMessage("今日计划暂时没有生成，已先使用真实歌库。");
       setErrors((items) => [...items, `今日计划失败：${todayPlan.reason instanceof Error ? todayPlan.reason.message : "未知错误"}`]);
     }
@@ -163,6 +188,8 @@ function App() {
     else setErrors((items) => [...items, `配置诊断失败：${settings.reason instanceof Error ? settings.reason.message : "未知错误"}`]);
     if (localMusic.status === "fulfilled") setLocalScan(localMusic.value);
     else setErrors((items) => [...items, `本地歌库扫描失败：${localMusic.reason instanceof Error ? localMusic.reason.message : "未知错误"}`]);
+    if (voice.status === "fulfilled") setVoiceStatus(voice.value);
+    else setErrors((items) => [...items, `电台旁白状态读取失败：${voice.reason instanceof Error ? voice.reason.message : "未知错误"}`]);
   }
 
   async function sendPlayerEvent(type: string, trackId = currentTrack?.id) {
@@ -179,7 +206,6 @@ function App() {
     event.preventDefault();
     const input = chatInput.trim();
     if (!input) return;
-    userInteractedRef.current = true;
     const shouldContinue = playing;
     setChatInput("");
     setMessage("Claudio 正在整理这一轮。");
@@ -194,6 +220,7 @@ function App() {
       setCurrentIndex(0);
       setPlaying(shouldContinue && Boolean(nextPlan.queue[0]?.streamUrl));
       setMessage(nextPlan.reason);
+      setHostMessage(nextPlan.reply);
       speak(nextPlan.reply);
     } catch (error) {
       const reason = error instanceof Error ? error.message : "未知错误";
@@ -202,8 +229,35 @@ function App() {
     }
   }
 
-  function speak(text: string) {
-    if (!voiceEnabled || !("speechSynthesis" in window)) return;
+  async function speak(text: string) {
+    if (!radioHostEnabled) return;
+
+    if (voiceStatus?.audioSupported) {
+      try {
+        const response = await fetch("/api/voice/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        const contentType = response.headers.get("content-type") || "";
+        if (response.ok && contentType.startsWith("audio/")) {
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const voiceAudio = voiceAudioRef.current;
+          if (voiceAudio) {
+            voiceAudio.pause();
+            voiceAudio.src = url;
+            voiceAudio.onended = () => URL.revokeObjectURL(url);
+            await voiceAudio.play();
+            return;
+          }
+        }
+      } catch {
+        // 真实 TTS 失败时继续走浏览器回退，不能让 Claudio 沉默。
+      }
+    }
+
+    if (!("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text.replace(/\n/g, " "));
     utterance.lang = "zh-CN";
@@ -212,8 +266,30 @@ function App() {
     window.speechSynthesis.speak(utterance);
   }
 
+  async function requestHostNarration(kind: "intro" | "between-tracks", track?: Track, previousTrack?: Track) {
+    if (!radioHostEnabled || !track) return;
+    const key = `${kind}:${previousTrack?.id || "none"}:${track.id}`;
+    if (lastNarrationKeyRef.current === key) return;
+    lastNarrationKeyRef.current = key;
+
+    try {
+      const narration = await api<HostNarrationResponse>(kind === "intro" ? "/api/host/intro" : "/api/host/between-tracks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trackId: track.id,
+          previousTrackId: previousTrack?.id
+        })
+      });
+      setHostMessage(narration.text);
+      speak(narration.text);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "未知错误";
+      setErrors((items) => [`电台旁白生成失败：${reason}`, ...items].slice(0, 6));
+    }
+  }
+
   function togglePlay() {
-    userInteractedRef.current = true;
     if (!currentTrack) return;
     if (!currentTrack.streamUrl) {
       setPlaying(false);
@@ -228,6 +304,7 @@ function App() {
       audio.pause();
       setPlaying(false);
     } else {
+      requestHostNarration("intro", currentTrack);
       audio.play().then(() => {
         setPlaying(true);
         sendPlayerEvent("play");
@@ -239,9 +316,9 @@ function App() {
   }
 
   function selectTrack(nextIndex: number, options: { continuePlayback?: boolean; eventType?: string } = {}) {
-    userInteractedRef.current = true;
     if (!activeQueue.length) return;
     const normalizedIndex = (nextIndex + activeQueue.length) % activeQueue.length;
+    const previousTrack = currentTrack;
     const nextTrack = activeQueue[normalizedIndex];
     const shouldContinue = options.continuePlayback ?? playing;
     setCurrentIndex(normalizedIndex);
@@ -252,6 +329,7 @@ function App() {
       return;
     }
     setPlaying(shouldContinue && Boolean(nextTrack.streamUrl));
+    if (nextTrack.streamUrl) requestHostNarration(previousTrack ? "between-tracks" : "intro", nextTrack, previousTrack);
   }
 
   function move(delta: number) {
@@ -262,6 +340,7 @@ function App() {
   const provider = providerLabel(plan?.aiProvider);
   const queueCount = activeQueue.length;
   const providerSummary = useMemo(() => diagnostics?.summary, [diagnostics]);
+  const voiceDetail = voiceStatus?.audioSupported ? `真实 TTS：${voiceStatus.provider}` : "浏览器语音回退";
 
   return (
     <main className="shell">
@@ -287,6 +366,7 @@ function App() {
           duration={duration}
           progress={progress}
           sourceHint={sourceHint}
+          hostMessage={hostMessage}
           onPlay={togglePlay}
           onPrev={() => move(-1)}
           onNext={() => move(1)}
@@ -296,9 +376,7 @@ function App() {
           onProgress={(value) => {
             const audio = audioRef.current;
             setProgress(value);
-            if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
-              audio.currentTime = (value / 1000) * audio.duration;
-            }
+            if (audio && Number.isFinite(audio.duration) && audio.duration > 0) audio.currentTime = (value / 1000) * audio.duration;
           }}
           onVolume={(value) => {
             if (audioRef.current) audioRef.current.volume = value;
@@ -311,8 +389,8 @@ function App() {
           chatInput={chatInput}
           setChatInput={setChatInput}
           submitChat={submitChat}
-          voiceEnabled={voiceEnabled}
-          setVoiceEnabled={setVoiceEnabled}
+          radioHostEnabled={radioHostEnabled}
+          setRadioHostEnabled={setRadioHostEnabled}
         />
 
         <QueuePanel queue={activeQueue} currentIndex={currentIndex} selectTrack={(index) => selectTrack(index)} queueCount={queueCount} />
@@ -323,11 +401,12 @@ function App() {
         <TastePanel taste={taste} />
         <LocalLibraryPanel localScan={localScan} />
         <div className="panel">
-          <p className="panel-label">语音</p>
+          <p className="panel-label">电台旁白</p>
           <label className="voice-toggle">
-            <input type="checkbox" checked={voiceEnabled} onChange={(event) => setVoiceEnabled(event.target.checked)} />
-            <span>朗读 Claudio 的回应</span>
+            <input type="checkbox" checked={radioHostEnabled} onChange={(event) => setRadioHostEnabled(event.target.checked)} />
+            <span>让 Claudio 自己解读歌曲</span>
           </label>
+          <p className="tiny">{voiceDetail}</p>
         </div>
       </section>
 
@@ -347,6 +426,7 @@ function App() {
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
       />
+      <audio ref={voiceAudioRef} preload="none" />
     </main>
   );
 }
@@ -359,6 +439,7 @@ function PlayerPanel(props: {
   duration: number;
   progress: number;
   sourceHint: string;
+  hostMessage: string;
   onPlay: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -382,13 +463,14 @@ function PlayerPanel(props: {
       <p className="now-label">{props.playing ? "正在播放" : "当前曲目"}</p>
       <h2>{track?.title || "等待歌曲"}</h2>
       <p className="muted">{track ? `${track.artist} · ${track.album || "未知专辑"}` : "还没有队列"}</p>
+      <div className="host-line" aria-live="polite">{props.hostMessage || "Claudio 会在播放时轻声解读这一首。"}</div>
       <div className="meter" aria-hidden="true"><span /><span /><span /><span /><span /></div>
       <div className="controls">
         <button type="button" title="上一首" onClick={props.onPrev} disabled={!track}>‹</button>
         <button className="primary" type="button" title="播放/暂停" onClick={props.onPlay} disabled={!track}>{props.playing ? "暂停" : "播放"}</button>
         <button type="button" title="下一首" onClick={props.onNext} disabled={!track}>›</button>
         <button type="button" title="喜欢" onClick={props.onLike}>♡</button>
-        <button type="button" title="跳过" onClick={props.onSkip}>↷</button>
+        <button type="button" title="跳过" onClick={props.onSkip}>↝</button>
       </div>
       <div className="transport">
         <span>{formatTime(props.currentTime)}</span>
@@ -411,8 +493,8 @@ function ChatPanel(props: {
   chatInput: string;
   setChatInput: (value: string) => void;
   submitChat: (event: FormEvent) => void;
-  voiceEnabled: boolean;
-  setVoiceEnabled: (value: boolean) => void;
+  radioHostEnabled: boolean;
+  setRadioHostEnabled: (value: boolean) => void;
 }) {
   return (
     <section className="panel chat-panel">
@@ -420,7 +502,7 @@ function ChatPanel(props: {
       <div className="reply">{props.message || props.plan?.reply || "正在读取 Claudio 的回应。"}</div>
       <form className="composer" onSubmit={props.submitChat}>
         <input value={props.chatInput} onChange={(event) => props.setChatInput(event.target.value)} placeholder="比如：今晚想听安静一点 / 适合写代码的 / 有点 emo 但别太丧" />
-        <button type="button" title="语音输入" onClick={() => props.setVoiceEnabled(!props.voiceEnabled)}>语音</button>
+        <button type="button" title="切换电台旁白" onClick={() => props.setRadioHostEnabled(!props.radioHostEnabled)}>旁白</button>
         <button type="submit">发送</button>
       </form>
       <div className="quick-actions">
