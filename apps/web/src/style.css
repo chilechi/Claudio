@@ -112,7 +112,7 @@ h1 {
 
 .lower-grid {
   display: grid;
-  grid-template-columns: 1.1fr 1.3fr 0.8fr;
+  grid-template-columns: 1.1fr 1.2fr 0.9fr 0.8fr;
   gap: 16px;
   margin-top: 16px;
 }
@@ -136,6 +136,7 @@ h1 {
 .player-panel, .chat-panel, .queue-panel { min-height: 610px; }
 
 .cover {
+  overflow: hidden;
   display: grid;
   width: 100%;
   aspect-ratio: 1;
@@ -147,6 +148,17 @@ h1 {
     linear-gradient(135deg, rgba(120, 214, 163, 0.18), transparent 45%),
     linear-gradient(315deg, rgba(233, 130, 109, 0.18), transparent 45%),
     var(--panel-soft);
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cover.has-image {
+  border-style: solid;
+  background: var(--panel-soft);
 }
 
 .cover span {
@@ -268,10 +280,15 @@ h2 { min-height: 68px; margin: 8px 0; font-size: 28px; line-height: 1.2; font-we
 
 .queue-index { color: var(--green); font-family: "Courier New", monospace; }
 .queue-title, .queue-meta { margin: 0; }
-.queue-title { font-weight: 650; }
+.queue-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+}
 .queue-meta { margin-top: 4px; color: var(--dim); font-size: 13px; }
 
-.reason, .taste-summary { margin: 0 0 16px; color: var(--text); font-size: 24px; line-height: 1.55; }
+.reason, .taste-summary, .library-summary { margin: 0 0 16px; color: var(--text); font-size: 24px; line-height: 1.55; }
 .routine-segments { display: grid; gap: 10px; }
 .routine-item {
   display: grid;
@@ -283,6 +300,13 @@ h2 { min-height: 68px; margin: 8px 0; font-size: 28px; line-height: 1.2; font-we
 }
 
 .tags { display: flex; flex-wrap: wrap; gap: 10px; }
+.library-stats { display: flex; flex-wrap: wrap; gap: 10px; }
+.library-stats span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--muted);
+}
 .voice-toggle { display: flex; align-items: center; gap: 10px; color: var(--muted); }
 
 .diagnostics-panel { margin-top: 16px; }

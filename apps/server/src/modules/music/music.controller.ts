@@ -80,6 +80,19 @@ export class MusicController {
     reply.send(stream.stream);
   }
 
+  @Get("/api/assets/covers/:coverKey")
+  async cover(@Param("coverKey") coverKey: string, @Res() reply: FastifyReply) {
+    const cover = await this.music.resolveCover(coverKey);
+    if (!cover) {
+      reply.code(404).send({ error: "Cover not found" });
+      return;
+    }
+    reply.header("Content-Type", cover.contentType);
+    reply.header("Content-Length", String(cover.size));
+    reply.header("Cache-Control", "public, max-age=86400");
+    reply.send(cover.stream);
+  }
+
   @Get("/api/state")
   stateSnapshot() {
     return this.state.getState();

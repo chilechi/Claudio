@@ -13,6 +13,18 @@ type RadioPlan = {
   reply: string;
 };
 
+type LocalScanResponse = {
+  configured: boolean;
+  reason?: string;
+  tracks: Track[];
+  stats?: {
+    trackCount: number;
+    playableCount: number;
+    taggedCount: number;
+    fallbackFilenameCount: number;
+  };
+};
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
   const text = await response.text();
@@ -56,6 +68,7 @@ function App() {
   const [radio, setRadio] = useState<RadioPlan | null>(null);
   const [taste, setTaste] = useState<TasteProfileResponse | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
+  const [localScan, setLocalScan] = useState<LocalScanResponse | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -129,11 +142,12 @@ function App() {
     const restoredIndex = nextQueue.findIndex((track) => track.id === savedState.currentTrackId);
     setCurrentIndex(restoredIndex >= 0 ? restoredIndex : 0);
 
-    const [todayPlan, radioPlan, tasteProfile, settings] = await Promise.allSettled([
+    const [todayPlan, radioPlan, tasteProfile, settings, localMusic] = await Promise.allSettled([
       api<QueuePlan>("/api/plan/today"),
       api<RadioPlan>("/api/radio/today"),
       api<TasteProfileResponse>("/api/taste/profile"),
-      api<DiagnosticsResponse>("/api/settings/diagnostics")
+      api<DiagnosticsResponse>("/api/settings/diagnostics"),
+      api<LocalScanResponse>("/api/music/local/scan")
     ]);
     if (todayPlan.status === "fulfilled") {
       setPlan(todayPlan.value);
@@ -147,6 +161,8 @@ function App() {
     else setErrors((items) => [...items, `口味画像失败：${tasteProfile.reason instanceof Error ? tasteProfile.reason.message : "未知错误"}`]);
     if (settings.status === "fulfilled") setDiagnostics(settings.value);
     else setErrors((items) => [...items, `配置诊断失败：${settings.reason instanceof Error ? settings.reason.message : "未知错误"}`]);
+    if (localMusic.status === "fulfilled") setLocalScan(localMusic.value);
+    else setErrors((items) => [...items, `本地歌库扫描失败：${localMusic.reason instanceof Error ? localMusic.reason.message : "未知错误"}`]);
   }
 
   async function sendPlayerEvent(type: string, trackId = currentTrack?.id) {
@@ -305,6 +321,7 @@ function App() {
       <section className="lower-grid" aria-label="今日计划和设置">
         <TodayPlanPanel radio={radio} reason={message || plan?.reason || "正在读取今日计划。"} />
         <TastePanel taste={taste} />
+        <LocalLibraryPanel localScan={localScan} />
         <div className="panel">
           <p className="panel-label">语音</p>
           <label className="voice-toggle">
@@ -359,7 +376,9 @@ function PlayerPanel(props: {
         <span>{props.clock}</span>
         <small>{props.playing ? "● 播放中" : "● 待命"}</small>
       </div>
-      <div className="cover" aria-hidden="true"><span>{track?.artist?.slice(0, 1).toUpperCase() || "C"}</span></div>
+      <div className={track?.coverUrl ? "cover has-image" : "cover"} aria-hidden="true">
+        {track?.coverUrl ? <img src={track.coverUrl} alt="" /> : <span>{track?.artist?.slice(0, 1).toUpperCase() || "C"}</span>}
+      </div>
       <p className="now-label">{props.playing ? "正在播放" : "当前曲目"}</p>
       <h2>{track?.title || "等待歌曲"}</h2>
       <p className="muted">{track ? `${track.artist} · ${track.album || "未知专辑"}` : "还没有队列"}</p>
@@ -458,6 +477,35 @@ function TastePanel({ taste }: { taste: TasteProfileResponse | null }) {
           return <span key={tag}>{tag}{count}</span>;
         }) : <span>暂无足够口味记录</span>}
       </div>
+    </div>
+  );
+}
+
+function LocalLibraryPanel({ localScan }: { localScan: LocalScanResponse | null }) {
+  const stats = localScan?.stats;
+  if (!localScan) {
+    return (
+      <div className="panel">
+        <p className="panel-label">本地歌库</p>
+        <p className="empty-note">正在读取本地歌库信息。</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel">
+      <p className="panel-label">本地歌库</p>
+      {localScan?.configured ? (
+        <>
+          <p className="library-summary">{stats?.trackCount || 0} 首本地音频，{stats?.playableCount || 0} 首可播放。</p>
+          <div className="library-stats">
+            <span>标签识别 {stats?.taggedCount || 0}</span>
+            <span>文件名兜底 {stats?.fallbackFilenameCount || 0}</span>
+          </div>
+        </>
+      ) : (
+        <p className="empty-note">{localScan?.reason || "还没有配置 LOCAL_MUSIC_DIR。"}</p>
+      )}
     </div>
   );
 }

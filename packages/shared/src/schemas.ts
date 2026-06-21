@@ -34,6 +34,9 @@ export const trackSchema = z.object({
   source: musicSourceTypeSchema,
   playable: z.boolean().default(false),
   streamUrl: z.string().min(1).optional(),
+  coverUrl: z.string().min(1).optional(),
+  relativePath: z.string().min(1).optional(),
+  metadataQuality: z.enum(["tag", "filename", "manual"]).optional(),
   tags: z.array(z.string().min(1)).default([])
 });
 

@@ -20,6 +20,8 @@
   - `strict-acceptance.md`：严格验收标准，包含播放器真实交互。
   - `loops/`：v0.3 每个开发 Loop。
   - `validation/`：v0.3 每轮验收记录。
+- `phases/v0.4/`：本地歌库整理。
+  - `local-library-plan.md`：本地标签读取、缓存、封面和验收记录。
 
 ## 运行代码
 

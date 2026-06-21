@@ -80,6 +80,10 @@ export class MusicService {
     return this.state.recordPlayerEvent(body);
   }
 
+  async resolveCover(coverKey: string) {
+    return this.localMusic.resolveCover(coverKey);
+  }
+
   private async loadImportedLibrary(): Promise<ActiveLibrary> {
     const filePath = join(this.config.rootDir, "data", "library.json");
     const content = await readFile(filePath, "utf8");

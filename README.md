@@ -124,8 +124,21 @@ Invoke-RestMethod http://localhost:8080/api/chat -Method Post -ContentType "appl
 
 - `data/library.json`：初始歌库
 - `data/state.json`：本地状态记忆
+- `data/local-library-cache.json`：本地音频标签缓存，运行时自动生成，不提交
+- `data/cache/covers/`：本地音频封面缓存，运行时自动生成，不提交
 - `docs/phases/v0.1/reference/taste.md`：v0.1 口味档案
 - `docs/phases/v0.1/reference/routines.md`：v0.1 场景规则
+
+## 本地歌库整理
+
+`MUSIC_SOURCE=local` 时，Claudio 会扫描 `LOCAL_MUSIC_DIR` 并优先读取音频文件标签：
+
+- 歌名、歌手、专辑、时长来自音频标签。
+- 有内嵌封面时会导出到本地封面缓存，并在播放器里显示。
+- 读不到标签时会清洗文件名作为兜底，不再直接显示长 `obj_...` 文件名。
+- `/api/music/local/scan` 会返回本地曲库统计，包括总数、可播放数、标签识别数、文件名兜底数。
+
+缓存和封面都可以删除；下次启动或扫描时会自动重建。
 
 ## 开发清单
 
