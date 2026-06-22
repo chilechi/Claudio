@@ -3,6 +3,11 @@ import { createRoot } from "react-dom/client";
 import type { ActiveLibrary, DiagnosticsResponse, QueuePlan, State, TasteProfileResponse, Track } from "../../../packages/shared/src/index.js";
 import "./style.css";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 type RadioPlan = {
   mode: string;
   slot?: { label?: string; prompt?: string };
@@ -97,6 +102,8 @@ function App() {
   const [chatInput, setChatInput] = useState("");
   const [clock, setClock] = useState("--:--");
   const [light, setLight] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [appInstalled, setAppInstalled] = useState(false);
   const [radioHostEnabled, setRadioHostEnabled] = useState(true);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -132,6 +139,30 @@ function App() {
     boot().catch((error) => {
       setMessage(error instanceof Error ? error.message : "Claudio 没能读到歌单。先保持安静。");
     });
+  }, []);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !import.meta.env.PROD) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      setErrors((items) => ["PWA 离线缓存注册失败，仍可正常在线使用。", ...items].slice(0, 6));
+    });
+  }, []);
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const onInstalled = () => {
+      setAppInstalled(true);
+      setInstallPrompt(null);
+    };
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
   useEffect(() => {
@@ -336,6 +367,16 @@ function App() {
     selectTrack(currentIndex + delta);
   }
 
+  async function installApp() {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice.outcome === "accepted") {
+      setAppInstalled(true);
+      setInstallPrompt(null);
+    }
+  }
+
   const sourceHint = library?.fallbackReason || (library ? `当前音乐源：${sourceLabel(library.source)}。` : "音乐源读取中。");
   const provider = providerLabel(plan?.aiProvider);
   const queueCount = activeQueue.length;
@@ -353,6 +394,7 @@ function App() {
           <span>{provider}</span>
           <span>{plan?.mode || "读取中"}</span>
           <span>{sourceLabel(library?.source)}</span>
+          {!appInstalled && installPrompt ? <button className="theme-toggle" type="button" onClick={installApp}>安装</button> : null}
           <button className="theme-toggle" type="button" onClick={() => setLight((value) => !value)}>{light ? "亮色" : "暗色"}</button>
         </div>
       </header>

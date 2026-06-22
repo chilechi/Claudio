@@ -1,0 +1,28 @@
+{
+  "name": "Claudio",
+  "short_name": "Claudio",
+  "description": "Local personal AI radio",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0b0c",
+  "theme_color": "#0a0b0c",
+  "categories": ["music", "productivity", "entertainment"],
+  "icons": [
+    {
+      "src": "/icons/claudio-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open Claudio",
+      "short_name": "Radio",
+      "url": "/",
+      "description": "Open the Claudio radio console"
+    }
+  ]
+}

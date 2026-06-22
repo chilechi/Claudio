@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Claudio">
+  <rect width="512" height="512" rx="108" fill="#0a0b0c"/>
+  <path d="M0 0h512v512H0z" fill="url(#grid)" opacity=".44"/>
+  <circle cx="256" cy="256" r="164" fill="#12161a" stroke="#78d6a3" stroke-width="10"/>
+  <path d="M166 284c14 62 57 98 112 98 39 0 72-16 97-45l-30-33c-17 18-37 28-63 28-42 0-72-31-72-78 0-48 31-78 73-78 24 0 43 8 60 25l29-34c-24-27-56-41-94-41-65 0-117 49-117 128 0 10 1 20 5 30Z" fill="#f0eee7"/>
+  <path d="M139 362h234" stroke="#e9c46a" stroke-width="16" stroke-linecap="round"/>
+  <path d="M142 406h54m34 0h140" stroke="#78d6a3" stroke-width="12" stroke-linecap="round"/>
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0v32" fill="none" stroke="#f0eee7" stroke-opacity=".16" stroke-width="2"/>
+    </pattern>
+  </defs>
+</svg>

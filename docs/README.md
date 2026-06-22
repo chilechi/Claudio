@@ -9,6 +9,7 @@
 - `phases/v0.3/`：完整前后端工程化迁移，包含严格验收标准。
 - `phases/v0.4/`：本地歌库整理，包含音频标签、缓存、封面和验收记录。
 - `phases/v0.5/`：AI 电台旁白与主播语音，包含 host/voice 接口和验收记录。
+- `phases/v0.6/`：PWA 安装体验，包含 manifest、service worker 和验收记录。
 
 ## 运行代码
 
