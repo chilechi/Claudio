@@ -49,6 +49,29 @@ type VoiceStatus = {
   envVars: string[];
 };
 
+type RuntimeSnapshot = {
+  running: boolean;
+  programId?: string;
+  sessionTitle?: string;
+  queue: Track[];
+  currentTrack?: Track;
+  currentIndex: number;
+  hostMessage?: string;
+  jobs: Array<{ type: string; key: string; createdAt: string }>;
+  workerRunning: boolean;
+  updatedAt: string;
+};
+
+type RuntimeApiResponse = {
+  runtime?: RuntimeSnapshot;
+  plan?: QueuePlan;
+  hostMessage?: string;
+  currentTrack?: Track;
+  previousTrack?: Track;
+  intent?: { action: string; reason: string; delta?: number };
+  reason?: string;
+};
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
   const text = await response.text();
@@ -94,6 +117,8 @@ function App() {
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResponse | null>(null);
   const [localScan, setLocalScan] = useState<LocalScanResponse | null>(null);
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
+  const [runtime, setRuntime] = useState<RuntimeSnapshot | null>(null);
+  const [runtimeBusy, setRuntimeBusy] = useState(false);
   const [queue, setQueue] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -182,6 +207,44 @@ function App() {
     }
   }, [currentTrack?.id, currentTrack?.streamUrl]);
 
+  useEffect(() => {
+    const events = new EventSource("/api/events");
+
+    const applyRuntimeEvent = (event: MessageEvent) => {
+      const payload = JSON.parse(event.data) as RuntimeApiResponse & { type?: string; text?: string; action?: string; delta?: number };
+      if (payload.runtime) applyRuntime(payload.runtime);
+      if (payload.plan) setPlan(payload.plan);
+      if (payload.text) {
+        setHostMessage(payload.text);
+        speak(payload.text);
+      }
+      if (payload.action === "pause") {
+        audioRef.current?.pause();
+        setPlaying(false);
+      }
+      if (payload.action === "resume" && currentTrack?.streamUrl) {
+        audioRef.current?.play().then(() => setPlaying(true)).catch((error) => setMessage(playbackErrorMessage(error)));
+      }
+      if (payload.action === "volume" && typeof payload.delta === "number" && audioRef.current) {
+        audioRef.current.volume = Math.min(1, Math.max(0, audioRef.current.volume + payload.delta));
+      }
+    };
+
+    events.addEventListener("runtime-status", applyRuntimeEvent);
+    events.addEventListener("program-start", applyRuntimeEvent);
+    events.addEventListener("tracks-ready", applyRuntimeEvent);
+    events.addEventListener("host-message", applyRuntimeEvent);
+    events.addEventListener("now-playing", applyRuntimeEvent);
+    events.addEventListener("control", applyRuntimeEvent);
+    events.addEventListener("hourly-check", applyRuntimeEvent);
+    events.onerror = () => {
+      setErrors((items) => ["电台事件流暂时断开，页面仍可手动控制。", ...items].slice(0, 6));
+      events.close();
+    };
+
+    return () => events.close();
+  }, [currentTrack?.streamUrl, radioHostEnabled, voiceStatus?.audioSupported]);
+
   async function boot() {
     const [activeLibrary, savedState] = await Promise.all([
       api<ActiveLibrary>("/api/music/active-library"),
@@ -197,13 +260,14 @@ function App() {
     const restoredIndex = nextQueue.findIndex((track) => track.id === savedState.currentTrackId);
     setCurrentIndex(restoredIndex >= 0 ? restoredIndex : 0);
 
-    const [todayPlan, radioPlan, tasteProfile, settings, localMusic, voice] = await Promise.allSettled([
+    const [todayPlan, radioPlan, tasteProfile, settings, localMusic, voice, runtimeStatus] = await Promise.allSettled([
       api<QueuePlan>("/api/plan/today"),
       api<RadioPlan>("/api/radio/today"),
       api<TasteProfileResponse>("/api/taste/profile"),
       api<DiagnosticsResponse>("/api/settings/diagnostics"),
       api<LocalScanResponse>("/api/music/local/scan"),
-      api<VoiceStatus>("/api/voice/status")
+      api<VoiceStatus>("/api/voice/status"),
+      api<RuntimeSnapshot>("/api/runtime/status")
     ]);
 
     if (todayPlan.status === "fulfilled") setPlan(todayPlan.value);
@@ -221,6 +285,18 @@ function App() {
     else setErrors((items) => [...items, `本地歌库扫描失败：${localMusic.reason instanceof Error ? localMusic.reason.message : "未知错误"}`]);
     if (voice.status === "fulfilled") setVoiceStatus(voice.value);
     else setErrors((items) => [...items, `电台旁白状态读取失败：${voice.reason instanceof Error ? voice.reason.message : "未知错误"}`]);
+    if (runtimeStatus.status === "fulfilled") applyRuntime(runtimeStatus.value);
+    else setErrors((items) => [...items, `电台运行态读取失败：${runtimeStatus.reason instanceof Error ? runtimeStatus.reason.message : "未知错误"}`]);
+  }
+
+  function applyRuntime(nextRuntime: RuntimeSnapshot) {
+    setRuntime(nextRuntime);
+    if (nextRuntime.queue?.length) {
+      setQueue(nextRuntime.queue);
+      setCurrentIndex(Math.max(0, Math.min(nextRuntime.currentIndex || 0, nextRuntime.queue.length - 1)));
+    }
+    if (nextRuntime.hostMessage) setHostMessage(nextRuntime.hostMessage);
+    if (nextRuntime.sessionTitle) setMessage(`电台运行中：${nextRuntime.sessionTitle}`);
   }
 
   async function sendPlayerEvent(type: string, trackId = currentTrack?.id) {
@@ -237,26 +313,65 @@ function App() {
     event.preventDefault();
     const input = chatInput.trim();
     if (!input) return;
-    const shouldContinue = playing;
     setChatInput("");
     setMessage("Claudio 正在整理这一轮。");
     try {
-      const nextPlan = await api<QueuePlan>("/api/chat", {
+      const result = await api<RuntimeApiResponse>("/api/runtime/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input })
       });
-      setPlan(nextPlan);
-      setQueue(nextPlan.queue);
-      setCurrentIndex(0);
-      setPlaying(shouldContinue && Boolean(nextPlan.queue[0]?.streamUrl));
-      setMessage(nextPlan.reason);
-      setHostMessage(nextPlan.reply);
-      speak(nextPlan.reply);
+      if (result.runtime) applyRuntime(result.runtime);
+      if (result.plan) setPlan(result.plan);
+      if (result.intent?.action === "pause") audioRef.current?.pause();
+      if (result.intent?.action === "resume") audioRef.current?.play().then(() => setPlaying(true)).catch((error) => setMessage(playbackErrorMessage(error)));
+      if (result.intent?.action === "volume" && typeof result.intent.delta === "number" && audioRef.current) {
+        audioRef.current.volume = Math.min(1, Math.max(0, audioRef.current.volume + result.intent.delta));
+      }
+      if (result.hostMessage) {
+        setHostMessage(result.hostMessage);
+        speak(result.hostMessage);
+      }
+      setMessage(result.intent?.reason || result.reason || result.runtime?.sessionTitle || "Claudio 已更新电台状态。");
     } catch (error) {
       const reason = error instanceof Error ? error.message : "未知错误";
       setMessage(`Claudio 暂时没有接住：${reason}`);
       setErrors((items) => [`聊天请求失败：${reason}`, ...items].slice(0, 6));
+    }
+  }
+
+  async function startRuntime() {
+    setRuntimeBusy(true);
+    setMessage("Claudio 正在开播。");
+    try {
+      const result = await api<RuntimeApiResponse>("/api/runtime/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: chatInput.trim() || "打开 Claudio 电台" })
+      });
+      if (result.runtime) applyRuntime(result.runtime);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "未知错误";
+      setMessage(`电台开播失败：${reason}`);
+      setErrors((items) => [`电台开播失败：${reason}`, ...items].slice(0, 6));
+    } finally {
+      setRuntimeBusy(false);
+    }
+  }
+
+  async function stopRuntime() {
+    setRuntimeBusy(true);
+    try {
+      const nextRuntime = await api<RuntimeSnapshot>("/api/runtime/stop", { method: "POST" });
+      applyRuntime(nextRuntime);
+      audioRef.current?.pause();
+      setPlaying(false);
+      setMessage("电台已停止。");
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "未知错误";
+      setErrors((items) => [`电台停止失败：${reason}`, ...items].slice(0, 6));
+    } finally {
+      setRuntimeBusy(false);
     }
   }
 
@@ -395,6 +510,9 @@ function App() {
           <span>{plan?.mode || "读取中"}</span>
           <span>{sourceLabel(library?.source)}</span>
           {!appInstalled && installPrompt ? <button className="theme-toggle" type="button" onClick={installApp}>安装</button> : null}
+          <button className="theme-toggle" type="button" onClick={runtime?.running ? stopRuntime : startRuntime} disabled={runtimeBusy}>
+            {runtime?.running ? "停播" : "开播"}
+          </button>
           <button className="theme-toggle" type="button" onClick={() => setLight((value) => !value)}>{light ? "亮色" : "暗色"}</button>
         </div>
       </header>
@@ -433,6 +551,10 @@ function App() {
           submitChat={submitChat}
           radioHostEnabled={radioHostEnabled}
           setRadioHostEnabled={setRadioHostEnabled}
+          runtime={runtime}
+          runtimeBusy={runtimeBusy}
+          startRuntime={startRuntime}
+          stopRuntime={stopRuntime}
         />
 
         <QueuePanel queue={activeQueue} currentIndex={currentIndex} selectTrack={(index) => selectTrack(index)} queueCount={queueCount} />
@@ -449,6 +571,10 @@ function App() {
             <span>让 Claudio 自己解读歌曲</span>
           </label>
           <p className="tiny">{voiceDetail}</p>
+          <p className="tiny">
+            {runtime?.running ? `正在播出：${runtime.sessionTitle || "自由电台"}` : "电台未开播，仍可手动播放。"}
+            {runtime?.jobs?.length ? ` · 队列任务 ${runtime.jobs.length}` : ""}
+          </p>
         </div>
       </section>
 
@@ -537,6 +663,10 @@ function ChatPanel(props: {
   submitChat: (event: FormEvent) => void;
   radioHostEnabled: boolean;
   setRadioHostEnabled: (value: boolean) => void;
+  runtime: RuntimeSnapshot | null;
+  runtimeBusy: boolean;
+  startRuntime: () => void;
+  stopRuntime: () => void;
 }) {
   return (
     <section className="panel chat-panel">
@@ -547,6 +677,12 @@ function ChatPanel(props: {
         <button type="button" title="切换电台旁白" onClick={() => props.setRadioHostEnabled(!props.radioHostEnabled)}>旁白</button>
         <button type="submit">发送</button>
       </form>
+      <div className="runtime-actions">
+        <button type="button" onClick={props.runtime?.running ? props.stopRuntime : props.startRuntime} disabled={props.runtimeBusy}>
+          {props.runtime?.running ? "停止电台" : "开始电台"}
+        </button>
+        <span>{props.runtime?.running ? `直播中 · ${props.runtime.sessionTitle || "自由电台"}` : "待命 · 可以先开播，也可以直接输入一句气氛"}</span>
+      </div>
       <div className="quick-actions">
         {["夜晚", "写代码", "Emo", "睡前"].map((label) => <button key={label} type="button" onClick={() => props.setChatInput(label)}>{label}</button>)}
       </div>

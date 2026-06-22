@@ -201,13 +201,13 @@ h2 { min-height: 68px; margin: 8px 0; font-size: 28px; line-height: 1.2; font-we
   50% { transform: scaleY(1); opacity: 0.9; }
 }
 
-.controls, .utility-controls, .transport, .composer, .quick-actions {
+.controls, .utility-controls, .transport, .composer, .quick-actions, .runtime-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.controls button, .utility-controls button, .composer button {
+.controls button, .utility-controls button, .composer button, .runtime-actions button {
   min-height: 46px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -253,6 +253,18 @@ h2 { min-height: 68px; margin: 8px 0; font-size: 28px; line-height: 1.2; font-we
 }
 
 .quick-actions { margin-top: 14px; flex-wrap: wrap; }
+
+.runtime-actions {
+  min-height: 48px;
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.runtime-actions span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .queue-count {
   position: absolute;

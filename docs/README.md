@@ -10,6 +10,7 @@
 - `phases/v0.4/`：本地歌库整理，包含音频标签、缓存、封面和验收记录。
 - `phases/v0.5/`：AI 电台旁白与主播语音，包含 host/voice 接口和验收记录。
 - `phases/v0.6/`：PWA 安装体验，包含 manifest、service worker 和验收记录。
+- `phases/v0.7/`：参考 Claudio-FM 后补齐电台运行内核、事件流、意图路由和 TTS 缓存。
 
 ## 运行代码
 
