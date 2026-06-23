@@ -1,4 +1,5 @@
-import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { ActiveLibrary, DiagnosticsResponse, QueuePlan, State, TasteProfileResponse, Track } from "../../../packages/shared/src/index.js";
 import "./style.css";
@@ -108,7 +109,553 @@ function playbackErrorMessage(error?: unknown) {
   return `当前曲目播放失败${detail}，请检查音频文件或浏览器播放权限。`;
 }
 
+/* ── Mode → CSS class ── */
+function modeClass(mode?: string): string {
+  if (!mode) return "";
+  if (mode === "bedtime") return "mode-bedtime";
+  if (mode === "coding") return "mode-coding";
+  if (mode === "emo") return "mode-emo";
+  if (mode === "clear") return "mode-clear";
+  if (mode === "night" || mode === "evening") return "mode-evening";
+  return "mode-night";
+}
+
+/* ── Atmosphere label ── */
+function atmosphereLabel(mode?: string, slotLabel?: string): string {
+  if (slotLabel) return slotLabel;
+  const labels: Record<string, string> = {
+    coding: "专注电台",
+    night: "深夜电台",
+    emo: "情绪电台",
+    bedtime: "睡前电台",
+    clear: "晨醒电台",
+    evening: "晚间电台"
+  };
+  return labels[mode || ""] || "Claudio 电台";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AI ORB
+═══════════════════════════════════════════════════════════════════════════ */
+
+function AiOrb(props: {
+  running: boolean;
+  workerRunning: boolean;
+  ttsSpeaking: boolean;
+  mode?: string;
+}) {
+  const stateClass = props.ttsSpeaking ? "speaking" : props.workerRunning ? "thinking" : "";
+
+  return (
+    <div className="orb-container">
+      {/* Ripple rings — only when TTS speaking */}
+      <AnimatePresence>
+        {props.ttsSpeaking && (
+          <>
+            <motion.div
+              className="orb-ripple"
+              initial={{ opacity: 0.6, scale: 1 }}
+              animate={{ opacity: 0, scale: 1.5 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
+            />
+            <motion.div
+              className="orb-ripple"
+              initial={{ opacity: 0.5, scale: 1 }}
+              animate={{ opacity: 0, scale: 1.35 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut", delay: 0.4 }}
+            />
+            <motion.div
+              className="orb-ripple"
+              initial={{ opacity: 0.4, scale: 1 }}
+              animate={{ opacity: 0, scale: 1.2 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut", delay: 0.8 }}
+            />
+          </>
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        className={`orb${stateClass ? ` ${stateClass}` : ""}`}
+        animate={
+          props.ttsSpeaking
+            ? {
+                scale: [1, 1.04, 1, 1.03, 1],
+                transition: { repeat: Infinity, duration: 2.5, ease: "easeInOut" }
+              }
+            : props.workerRunning
+              ? {
+                  scale: [1, 1.02, 1],
+                  transition: { repeat: Infinity, duration: 1.2, ease: "easeInOut" }
+                }
+              : {
+                  scale: [1, 1.015, 1],
+                  transition: { repeat: Infinity, duration: 3.5, ease: "easeInOut" }
+                }
+        }
+      >
+        <span className="orb-name">Claudio</span>
+        <span className="orb-status">
+          {props.running && <span className="orb-status-dot" />}
+          {props.running ? "LIVE" : "待命"}
+        </span>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIVE SUBTITLES
+═══════════════════════════════════════════════════════════════════════════ */
+
+function LiveSubtitles(props: {
+  hostMessage: string;
+  workerRunning: boolean;
+  ttsSpeaking: boolean;
+  running: boolean;
+}) {
+  if (props.workerRunning) {
+    return (
+      <div className="subtitles-container">
+        <div className="subtitles-thinking">
+          <span>Claudio 正在感受这一刻</span>
+          <span className="subtitles-thinking-dots">
+            <motion.span animate={{ opacity: [0.25, 1, 0.25] }} transition={{ repeat: Infinity, duration: 1.2 }} />
+            <motion.span animate={{ opacity: [0.25, 1, 0.25] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.15 }} />
+            <motion.span animate={{ opacity: [0.25, 1, 0.25] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.3 }} />
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="subtitles-container">
+      <AnimatePresence mode="wait">
+        {props.hostMessage ? (
+          <motion.p
+            key={props.hostMessage}
+            className={`subtitles-text${props.ttsSpeaking ? " speaking" : ""}`}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ type: "spring", stiffness: 350, damping: 30 }}
+          >
+            {props.hostMessage}
+          </motion.p>
+        ) : (
+          <motion.p
+            key="placeholder"
+            className="subtitles-placeholder"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            {props.running
+              ? "Claudio 正在为你挑选下一首歌..."
+              : "跟 Claudio 说说话，或者选一种气氛"}
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOW PLAYING
+═══════════════════════════════════════════════════════════════════════════ */
+
+function NowPlaying(props: { track?: Track; playing: boolean }) {
+  if (!props.track) {
+    return (
+      <div className="now-playing">
+        <span className="now-playing-icon">🎵</span>
+        <span style={{ color: "var(--text-dim)" }}>等待歌曲...</span>
+      </div>
+    );
+  }
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={props.track.id}
+        className="now-playing"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ type: "spring", stiffness: 400, damping: 28 }}
+      >
+        <span className="now-playing-icon">{props.playing ? "▶" : "🎵"}</span>
+        <span className="now-playing-track">{props.track.title}</span>
+        <span className="now-playing-separator">—</span>
+        <span>{props.track.artist}</span>
+        {props.track.durationText && (
+          <>
+            <span className="now-playing-separator">·</span>
+            <span className="now-playing-duration">{props.track.durationText}</span>
+          </>
+        )}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOOD CHIPS
+═══════════════════════════════════════════════════════════════════════════ */
+
+const MOODS = [
+  { label: "夜晚", prompt: "今晚想听安静一点" },
+  { label: "专注", prompt: "适合写代码的背景音乐" },
+  { label: "Emo", prompt: "有点 emo 但别太丧" },
+  { label: "睡前", prompt: "睡前安静收尾" },
+  { label: "晨醒", prompt: "清醒明亮地开始" },
+];
+
+function MoodChips(props: { onSelect: (prompt: string) => void }) {
+  return (
+    <div className="moods-row">
+      {MOODS.map((mood, i) => (
+        <motion.button
+          key={mood.label}
+          className="mood-chip"
+          type="button"
+          onClick={() => props.onSelect(mood.prompt)}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 + i * 0.06, type: "spring", stiffness: 350, damping: 26 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.96 }}
+        >
+          {mood.label}
+        </motion.button>
+      ))}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONVERSATION BAR
+═══════════════════════════════════════════════════════════════════════════ */
+
+function ConversationBar(props: {
+  chatInput: string;
+  setChatInput: (v: string) => void;
+  submitChat: (e: FormEvent) => void;
+}) {
+  return (
+    <form className="conversation-bar" onSubmit={props.submitChat}>
+      <input
+        className="conversation-input"
+        value={props.chatInput}
+        onChange={(e) => props.setChatInput(e.target.value)}
+        placeholder="跟 Claudio 说说现在的心情..."
+      />
+      <motion.button
+        className="conversation-submit"
+        type="submit"
+        disabled={!props.chatInput.trim()}
+        whileTap={{ scale: 0.92 }}
+      >
+        ↗
+      </motion.button>
+    </form>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MINIMAL TRANSPORT
+═══════════════════════════════════════════════════════════════════════════ */
+
+function MinimalTransport(props: {
+  playing: boolean;
+  currentTime: number;
+  duration: number;
+  progress: number;
+  onPlay: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onLike: () => void;
+  onSkip: () => void;
+  onProgress: (v: number) => void;
+}) {
+  return (
+    <div className="transport">
+      <div className="transport-controls">
+        <motion.button className="transport-btn" type="button" title="上一首" onClick={props.onPrev} whileTap={{ scale: 0.9 }}>
+          ◀◀
+        </motion.button>
+
+        <motion.button
+          className="transport-btn play"
+          type="button"
+          title={props.playing ? "暂停" : "播放"}
+          onClick={props.onPlay}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.94 }}
+        >
+          {props.playing ? "❚❚" : "▶"}
+        </motion.button>
+
+        <motion.button className="transport-btn" type="button" title="下一首" onClick={props.onNext} whileTap={{ scale: 0.9 }}>
+          ▶▶
+        </motion.button>
+
+        <motion.button className="transport-btn small" type="button" title="喜欢" onClick={props.onLike} whileTap={{ scale: 0.88 }}>
+          ♡
+        </motion.button>
+
+        <motion.button className="transport-btn small" type="button" title="跳过" onClick={props.onSkip} whileTap={{ scale: 0.88 }}>
+          ↝
+        </motion.button>
+      </div>
+
+      <div className="transport-progress">
+        <span className="transport-time">{formatTime(props.currentTime)}</span>
+        <input
+          type="range"
+          min="0"
+          max="1000"
+          value={props.progress}
+          onInput={(e) => props.onProgress(Number(e.currentTarget.value))}
+          onChange={(e) => props.onProgress(Number(e.target.value))}
+        />
+        <span className="transport-time">{formatTime(props.duration)}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   QUEUE DRAWER
+═══════════════════════════════════════════════════════════════════════════ */
+
+function QueueDrawer(props: {
+  queue: Track[];
+  currentIndex: number;
+  selectTrack: (index: number) => void;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const count = props.queue.length;
+
+  return (
+    <div className="queue-drawer">
+      <motion.div className="queue-header" onClick={props.onToggle}>
+        <div>
+          <span className="queue-header-label">队列</span>
+          <span className="queue-header-count"> · {count} 首</span>
+        </div>
+        <motion.span
+          className="queue-header-chevron"
+          animate={{ rotate: props.expanded ? 180 : 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 24 }}
+        >
+          ▾
+        </motion.span>
+      </motion.div>
+
+      <AnimatePresence>
+        {props.expanded && (
+          <motion.div
+            className="queue-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          >
+            {count === 0 ? (
+              <div className="queue-empty">
+                还没有可用队列。
+                <br />
+                先配置 LOCAL_MUSIC_DIR，或确认网易云歌单元数据已导入。
+              </div>
+            ) : (
+              props.queue.map((track, index) => (
+                <motion.div
+                  key={track.id}
+                  className={`queue-item${index === props.currentIndex ? " current" : ""}`}
+                  onClick={() => props.selectTrack(index)}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.03, type: "spring", stiffness: 400, damping: 28 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="queue-item-index">
+                    {index === props.currentIndex ? "▶" : String(index + 1).padStart(2, "0")}
+                  </span>
+                  <div className="queue-item-cover">
+                    {track.coverUrl ? <img src={track.coverUrl} alt="" /> : "🎵"}
+                  </div>
+                  <div className="queue-item-info">
+                    <p className="queue-item-title">{track.title}</p>
+                    <p className="queue-item-meta">
+                      {track.artist}{track.durationText ? ` · ${track.durationText}` : ""}
+                    </p>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SETTINGS DRAWER
+═══════════════════════════════════════════════════════════════════════════ */
+
+function SettingsDrawer(props: {
+  open: boolean;
+  onClose: () => void;
+  radio: RadioPlan | null;
+  reason: string;
+  taste: TasteProfileResponse | null;
+  localScan: LocalScanResponse | null;
+  diagnostics: DiagnosticsResponse | null;
+  providerSummary?: DiagnosticsResponse["summary"];
+  errors: string[];
+  radioHostEnabled: boolean;
+  setRadioHostEnabled: (v: boolean) => void;
+  voiceDetail: string;
+}) {
+  return (
+    <AnimatePresence>
+      {props.open && (
+        <>
+          <motion.div
+            className="settings-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            onClick={props.onClose}
+          />
+          <motion.div
+            className="settings-drawer"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", stiffness: 330, damping: 32 }}
+          >
+            <div className="settings-header">
+              <h2 className="settings-title">设置与诊断</h2>
+              <button className="settings-close" type="button" onClick={props.onClose}>
+                ✕
+              </button>
+            </div>
+
+            {/* Today Plan */}
+            <div className="settings-section">
+              <p className="settings-section-label">今日计划</p>
+              <p className="settings-text">{props.reason}</p>
+              <div style={{ display: "grid", gap: 8 }}>
+                <div className="provider-card ready">
+                  <strong>{props.radio?.slot?.label || props.radio?.mode || "读取中"}</strong>
+                  <p>{props.radio?.slot?.prompt || props.radio?.reply || "正在生成。"}</p>
+                </div>
+                <div className="provider-card fallback">
+                  <strong>日历</strong>
+                  <p>{props.radio?.calendar?.configured ? "已连接" : props.radio?.calendar?.reason || "未连接"}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Taste Profile */}
+            <div className="settings-section">
+              <p className="settings-section-label">口味画像</p>
+              <p className="settings-muted">
+                喜欢 {props.taste?.profile?.likedCount || 0} 首，跳过 {props.taste?.profile?.skippedCount || 0} 首。
+                画像来自当前真实歌库和播放事件。
+              </p>
+              {(props.taste?.profile?.topTags || []).length > 0 && (
+                <div className="tags-row" style={{ marginTop: 10 }}>
+                  {props.taste?.profile?.topTags.map((item) => {
+                    const tag = typeof item === "string" ? item : item.tag;
+                    const count = typeof item === "string" ? "" : ` · ${item.count}`;
+                    return <span key={tag} className="tag-chip">{tag}{count}</span>;
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Local Library */}
+            <div className="settings-section">
+              <p className="settings-section-label">本地歌库</p>
+              {props.localScan?.configured ? (
+                <>
+                  <p className="settings-muted">
+                    {props.localScan.stats?.trackCount || 0} 首本地音频，{props.localScan.stats?.playableCount || 0} 首可播放。
+                  </p>
+                  <div className="tags-row" style={{ marginTop: 8 }}>
+                    <span className="tag-chip">标签识别 {props.localScan.stats?.taggedCount || 0}</span>
+                    <span className="tag-chip">文件名兜底 {props.localScan.stats?.fallbackFilenameCount || 0}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="settings-muted">{props.localScan?.reason || "还没有配置 LOCAL_MUSIC_DIR。"}</p>
+              )}
+            </div>
+
+            {/* Voice Settings */}
+            <div className="settings-section">
+              <p className="settings-section-label">电台旁白</p>
+              <label className="voice-row">
+                <input
+                  type="checkbox"
+                  checked={props.radioHostEnabled}
+                  onChange={(e) => props.setRadioHostEnabled(e.target.checked)}
+                />
+                <span>让 Claudio 自己解读歌曲</span>
+              </label>
+              <p className="settings-tiny">{props.voiceDetail}</p>
+            </div>
+
+            {/* Diagnostics */}
+            <div className="settings-section">
+              <p className="settings-section-label">配置诊断</p>
+              <div className="settings-summary-row">
+                <span>可用 {props.providerSummary?.ready || 0}</span>
+                <span>回退 {props.providerSummary?.fallback || 0}</span>
+                <span>缺少 {props.providerSummary?.missing || 0}</span>
+                <span>{props.diagnostics?.secretPolicy || "不展示密钥原文"}</span>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                {(props.diagnostics?.providers || []).map((provider) => (
+                  <div className={`provider-card ${provider.state}`} key={provider.id}>
+                    <strong>{provider.label}</strong>
+                    <span>{statusLabel(provider.state)}</span>
+                    <p>{provider.detail || provider.reason || "已配置"}</p>
+                    <small>{(provider.envVars || []).join(" / ") || "无需配置"}</small>
+                  </div>
+                ))}
+              </div>
+              {props.errors.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  {props.errors.map((err) => (
+                    <div className="error-item" key={err}>{err}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   APP
+═══════════════════════════════════════════════════════════════════════════ */
+
 function App() {
+  /* ── State (preserved exactly) ── */
   const [library, setLibrary] = useState<ActiveLibrary | null>(null);
   const [state, setState] = useState<State | null>(null);
   const [plan, setPlan] = useState<QueuePlan | null>(null);
@@ -139,9 +686,15 @@ function App() {
   const playingRef = useRef(false);
   const lastNarrationKeyRef = useRef("");
 
+  /* ── New UI state ── */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [queueExpanded, setQueueExpanded] = useState(false);
+  const [ttsSpeaking, setTtsSpeaking] = useState(false);
+
   const activeQueue = queue.length ? queue : library?.tracks || [];
   const currentTrack = activeQueue[currentIndex];
 
+  /* ── Effects (preserved exactly) ── */
   useEffect(() => {
     document.body.classList.toggle("light", light);
   }, [light]);
@@ -245,6 +798,7 @@ function App() {
     return () => events.close();
   }, [currentTrack?.streamUrl, radioHostEnabled, voiceStatus?.audioSupported]);
 
+  /* ── Handlers (preserved exactly) ── */
   async function boot() {
     const [activeLibrary, savedState] = await Promise.all([
       api<ActiveLibrary>("/api/music/active-library"),
@@ -378,6 +932,8 @@ function App() {
   async function speak(text: string) {
     if (!radioHostEnabled) return;
 
+    setTtsSpeaking(true);
+
     if (voiceStatus?.audioSupported) {
       try {
         const response = await fetch("/api/voice/speak", {
@@ -393,22 +949,30 @@ function App() {
           if (voiceAudio) {
             voiceAudio.pause();
             voiceAudio.src = url;
-            voiceAudio.onended = () => URL.revokeObjectURL(url);
+            voiceAudio.onended = () => {
+              URL.revokeObjectURL(url);
+              setTtsSpeaking(false);
+            };
             await voiceAudio.play();
             return;
           }
         }
       } catch {
-        // 真实 TTS 失败时继续走浏览器回退，不能让 Claudio 沉默。
+        // fall through to browser fallback
       }
     }
 
-    if (!("speechSynthesis" in window)) return;
+    if (!("speechSynthesis" in window)) {
+      setTtsSpeaking(false);
+      return;
+    }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text.replace(/\n/g, " "));
     utterance.lang = "zh-CN";
     utterance.rate = 0.92;
     utterance.pitch = 0.92;
+    utterance.onend = () => setTtsSpeaking(false);
+    utterance.onerror = () => setTtsSpeaking(false);
     window.speechSynthesis.speak(utterance);
   }
 
@@ -492,94 +1056,139 @@ function App() {
     }
   }
 
-  const sourceHint = library?.fallbackReason || (library ? `当前音乐源：${sourceLabel(library.source)}。` : "音乐源读取中。");
+  /* ── Derived values ── */
   const provider = providerLabel(plan?.aiProvider);
-  const queueCount = activeQueue.length;
   const providerSummary = useMemo(() => diagnostics?.summary, [diagnostics]);
   const voiceDetail = voiceStatus?.audioSupported ? `真实 TTS：${voiceStatus.provider}` : "浏览器语音回退";
+  const mode = plan?.mode || runtime?.sessionTitle || "";
+  const atmosphere = atmosphereLabel(mode, radio?.slot?.label);
 
+  const handleSelectMood = useCallback((prompt: string) => {
+    setChatInput(prompt);
+  }, []);
+
+  /* ── Render ── */
   return (
-    <main className="shell">
-      <header className="topbar" aria-label="Claudio 状态">
-        <div>
-          <p className="eyebrow">个人 AI 电台</p>
-          <h1>Claudio</h1>
+    <main className={`shell ${modeClass(mode)}`}>
+      {/* Top Bar */}
+      <div className="topbar">
+        <div className="atmosphere">
+          <span className="atmosphere-label">{atmosphere}</span>
+          <span className="clock-text">{clock}</span>
         </div>
-        <div className="status-strip">
-          <span>{provider}</span>
-          <span>{plan?.mode || "读取中"}</span>
-          <span>{sourceLabel(library?.source)}</span>
-          {!appInstalled && installPrompt ? <button className="theme-toggle" type="button" onClick={installApp}>安装</button> : null}
-          <button className="theme-toggle" type="button" onClick={runtime?.running ? stopRuntime : startRuntime} disabled={runtimeBusy}>
-            {runtime?.running ? "停播" : "开播"}
+        <div className="topbar-actions">
+          {!appInstalled && installPrompt ? (
+            <button className="topbar-btn" type="button" onClick={installApp}>安装应用</button>
+          ) : null}
+          <button className="topbar-btn" type="button" onClick={() => setLight((v) => !v)}>
+            {light ? "亮色" : "暗色"}
           </button>
-          <button className="theme-toggle" type="button" onClick={() => setLight((value) => !value)}>{light ? "亮色" : "暗色"}</button>
+          <button
+            className={`topbar-btn${runtime?.running ? " live" : ""}`}
+            type="button"
+            onClick={runtime?.running ? stopRuntime : startRuntime}
+            disabled={runtimeBusy}
+          >
+            {runtime?.running ? (
+              <><span className="topbar-btn-live-dot" /> 停播</>
+            ) : (
+              "开播"
+            )}
+          </button>
         </div>
-      </header>
+      </div>
 
-      <section className="workspace" aria-label="电台控制台">
-        <PlayerPanel
-          clock={clock}
-          currentTrack={currentTrack}
-          playing={playing}
-          currentTime={currentTime}
-          duration={duration}
-          progress={progress}
-          sourceHint={sourceHint}
-          hostMessage={hostMessage}
-          onPlay={togglePlay}
-          onPrev={() => move(-1)}
-          onNext={() => move(1)}
-          onLike={() => sendPlayerEvent("like")}
-          onSkip={() => { sendPlayerEvent("skip"); selectTrack(currentIndex + 1, { continuePlayback: playing }); }}
-          onHide={() => sendPlayerEvent("hide")}
-          onProgress={(value) => {
-            const audio = audioRef.current;
-            setProgress(value);
-            if (audio && Number.isFinite(audio.duration) && audio.duration > 0) audio.currentTime = (value / 1000) * audio.duration;
-          }}
-          onVolume={(value) => {
-            if (audioRef.current) audioRef.current.volume = value;
-          }}
-        />
+      {/* AI Host Orb */}
+      <AiOrb
+        running={runtime?.running || false}
+        workerRunning={runtime?.workerRunning || false}
+        ttsSpeaking={ttsSpeaking}
+        mode={mode}
+      />
 
-        <ChatPanel
-          plan={plan}
-          message={message}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          submitChat={submitChat}
-          radioHostEnabled={radioHostEnabled}
-          setRadioHostEnabled={setRadioHostEnabled}
-          runtime={runtime}
-          runtimeBusy={runtimeBusy}
-          startRuntime={startRuntime}
-          stopRuntime={stopRuntime}
-        />
+      {/* Live Subtitles */}
+      <LiveSubtitles
+        hostMessage={hostMessage}
+        workerRunning={runtime?.workerRunning || false}
+        ttsSpeaking={ttsSpeaking}
+        running={runtime?.running || false}
+      />
 
-        <QueuePanel queue={activeQueue} currentIndex={currentIndex} selectTrack={(index) => selectTrack(index)} queueCount={queueCount} />
-      </section>
+      {/* Now Playing */}
+      <NowPlaying track={currentTrack} playing={playing} />
 
-      <section className="lower-grid" aria-label="今日计划和设置">
-        <TodayPlanPanel radio={radio} reason={message || plan?.reason || "正在读取今日计划。"} />
-        <TastePanel taste={taste} />
-        <LocalLibraryPanel localScan={localScan} />
-        <div className="panel">
-          <p className="panel-label">电台旁白</p>
-          <label className="voice-toggle">
-            <input type="checkbox" checked={radioHostEnabled} onChange={(event) => setRadioHostEnabled(event.target.checked)} />
-            <span>让 Claudio 自己解读歌曲</span>
-          </label>
-          <p className="tiny">{voiceDetail}</p>
-          <p className="tiny">
-            {runtime?.running ? `正在播出：${runtime.sessionTitle || "自由电台"}` : "电台未开播，仍可手动播放。"}
-            {runtime?.jobs?.length ? ` · 队列任务 ${runtime.jobs.length}` : ""}
-          </p>
-        </div>
-      </section>
+      {/* Mood Chips */}
+      <MoodChips onSelect={handleSelectMood} />
 
-      <DiagnosticsPanel diagnostics={diagnostics} summary={providerSummary} errors={errors} />
+      {/* Conversation Bar */}
+      <ConversationBar
+        chatInput={chatInput}
+        setChatInput={setChatInput}
+        submitChat={submitChat}
+      />
 
+      {/* Minimal Transport */}
+      <MinimalTransport
+        playing={playing}
+        currentTime={currentTime}
+        duration={duration}
+        progress={progress}
+        onPlay={togglePlay}
+        onPrev={() => move(-1)}
+        onNext={() => move(1)}
+        onLike={() => sendPlayerEvent("like")}
+        onSkip={() => { sendPlayerEvent("skip"); selectTrack(currentIndex + 1, { continuePlayback: playing }); }}
+        onProgress={(value) => {
+          const audio = audioRef.current;
+          setProgress(value);
+          if (audio && Number.isFinite(audio.duration) && audio.duration > 0) audio.currentTime = (value / 1000) * audio.duration;
+        }}
+      />
+
+      {/* Bottom Actions */}
+      <div className="bottom-actions">
+        <button
+          className={`action-chip${queueExpanded ? " active" : ""}`}
+          type="button"
+          onClick={() => setQueueExpanded((v) => !v)}
+        >
+          队列 · {activeQueue.length}
+        </button>
+        <button
+          className="action-chip"
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+        >
+          设置
+        </button>
+      </div>
+
+      {/* Queue Drawer */}
+      <QueueDrawer
+        queue={activeQueue}
+        currentIndex={currentIndex}
+        selectTrack={selectTrack}
+        expanded={queueExpanded}
+        onToggle={() => setQueueExpanded((v) => !v)}
+      />
+
+      {/* Settings Drawer */}
+      <SettingsDrawer
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        radio={radio}
+        reason={message || plan?.reason || "正在读取今日计划。"}
+        taste={taste}
+        localScan={localScan}
+        diagnostics={diagnostics}
+        providerSummary={providerSummary}
+        errors={errors}
+        radioHostEnabled={radioHostEnabled}
+        setRadioHostEnabled={setRadioHostEnabled}
+        voiceDetail={voiceDetail}
+      />
+
+      {/* Audio Elements */}
       <audio
         ref={audioRef}
         preload="metadata"
@@ -599,206 +1208,9 @@ function App() {
   );
 }
 
-function PlayerPanel(props: {
-  clock: string;
-  currentTrack?: Track;
-  playing: boolean;
-  currentTime: number;
-  duration: number;
-  progress: number;
-  sourceHint: string;
-  hostMessage: string;
-  onPlay: () => void;
-  onPrev: () => void;
-  onNext: () => void;
-  onLike: () => void;
-  onSkip: () => void;
-  onHide: () => void;
-  onProgress: (value: number) => void;
-  onVolume: (value: number) => void;
-}) {
-  const track = props.currentTrack;
-  return (
-    <aside className="panel player-panel">
-      <p className="panel-label">播放器</p>
-      <div className="clock-panel">
-        <span>{props.clock}</span>
-        <small>{props.playing ? "● 播放中" : "● 待命"}</small>
-      </div>
-      <div className={track?.coverUrl ? "cover has-image" : "cover"} aria-hidden="true">
-        {track?.coverUrl ? <img src={track.coverUrl} alt="" /> : <span>{track?.artist?.slice(0, 1).toUpperCase() || "C"}</span>}
-      </div>
-      <p className="now-label">{props.playing ? "正在播放" : "当前曲目"}</p>
-      <h2>{track?.title || "等待歌曲"}</h2>
-      <p className="muted">{track ? `${track.artist} · ${track.album || "未知专辑"}` : "还没有队列"}</p>
-      <div className="host-line" aria-live="polite">{props.hostMessage || "Claudio 会在播放时轻声解读这一首。"}</div>
-      <div className="meter" aria-hidden="true"><span /><span /><span /><span /><span /></div>
-      <div className="controls">
-        <button type="button" title="上一首" onClick={props.onPrev} disabled={!track}>‹</button>
-        <button className="primary" type="button" title="播放/暂停" onClick={props.onPlay} disabled={!track}>{props.playing ? "暂停" : "播放"}</button>
-        <button type="button" title="下一首" onClick={props.onNext} disabled={!track}>›</button>
-        <button type="button" title="喜欢" onClick={props.onLike}>♡</button>
-        <button type="button" title="跳过" onClick={props.onSkip}>↝</button>
-      </div>
-      <div className="transport">
-        <span>{formatTime(props.currentTime)}</span>
-        <input type="range" min="0" max="1000" value={props.progress} onInput={(event) => props.onProgress(Number(event.currentTarget.value))} onChange={(event) => props.onProgress(Number(event.target.value))} />
-        <span>{formatTime(props.duration)}</span>
-      </div>
-      <div className="utility-controls">
-        <button type="button" onClick={props.onHide}>隐藏</button>
-        <button type="button" onClick={props.onLike}>收藏</button>
-        <label>音量<input type="range" min="0" max="1" step="0.01" defaultValue="0.8" onInput={(event) => props.onVolume(Number(event.currentTarget.value))} onChange={(event) => props.onVolume(Number(event.target.value))} /></label>
-      </div>
-      <p className="tiny">{props.sourceHint}</p>
-    </aside>
-  );
-}
-
-function ChatPanel(props: {
-  plan: QueuePlan | null;
-  message: string;
-  chatInput: string;
-  setChatInput: (value: string) => void;
-  submitChat: (event: FormEvent) => void;
-  radioHostEnabled: boolean;
-  setRadioHostEnabled: (value: boolean) => void;
-  runtime: RuntimeSnapshot | null;
-  runtimeBusy: boolean;
-  startRuntime: () => void;
-  stopRuntime: () => void;
-}) {
-  return (
-    <section className="panel chat-panel">
-      <p className="panel-label">CLAUDIO</p>
-      <div className="reply">{props.message || props.plan?.reply || "正在读取 Claudio 的回应。"}</div>
-      <form className="composer" onSubmit={props.submitChat}>
-        <input value={props.chatInput} onChange={(event) => props.setChatInput(event.target.value)} placeholder="比如：今晚想听安静一点 / 适合写代码的 / 有点 emo 但别太丧" />
-        <button type="button" title="切换电台旁白" onClick={() => props.setRadioHostEnabled(!props.radioHostEnabled)}>旁白</button>
-        <button type="submit">发送</button>
-      </form>
-      <div className="runtime-actions">
-        <button type="button" onClick={props.runtime?.running ? props.stopRuntime : props.startRuntime} disabled={props.runtimeBusy}>
-          {props.runtime?.running ? "停止电台" : "开始电台"}
-        </button>
-        <span>{props.runtime?.running ? `直播中 · ${props.runtime.sessionTitle || "自由电台"}` : "待命 · 可以先开播，也可以直接输入一句气氛"}</span>
-      </div>
-      <div className="quick-actions">
-        {["夜晚", "写代码", "Emo", "睡前"].map((label) => <button key={label} type="button" onClick={() => props.setChatInput(label)}>{label}</button>)}
-      </div>
-    </section>
-  );
-}
-
-function QueuePanel({ queue, currentIndex, selectTrack, queueCount }: { queue: Track[]; currentIndex: number; selectTrack: (index: number) => void; queueCount: number }) {
-  return (
-    <aside className="panel queue-panel">
-      <p className="panel-label">队列</p>
-      <p className="queue-count">{queueCount} 首</p>
-      <ol className="queue">
-        {queue.map((track, index) => (
-          <li key={track.id} className={index === currentIndex ? "active" : ""} onClick={() => selectTrack(index)}>
-            <span className="queue-index">{String(index + 1).padStart(2, "0")}</span>
-            <div>
-              <p className="queue-title">{track.title}</p>
-              <p className="queue-meta">{track.artist} · {track.durationText || track.duration || "未知时长"}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-      {!queue.length ? <p className="empty-note">还没有可用队列。先配置 LOCAL_MUSIC_DIR，或确认网易云歌单元数据已导入。</p> : null}
-    </aside>
-  );
-}
-
-function TodayPlanPanel({ radio, reason }: { radio: RadioPlan | null; reason: string }) {
-  return (
-    <div className="panel">
-      <p className="panel-label">今日计划</p>
-      <p className="reason">{reason}</p>
-      <div className="routine-segments">
-        <div className="routine-item"><strong>{radio?.slot?.label || radio?.mode || "读取中"}</strong><span>{radio?.slot?.prompt || radio?.reply || "正在生成。"}</span></div>
-        <div className="routine-item"><strong>日历</strong><span>{radio?.calendar?.configured ? "已连接" : radio?.calendar?.reason || "未连接"}</span></div>
-      </div>
-    </div>
-  );
-}
-
-function TastePanel({ taste }: { taste: TasteProfileResponse | null }) {
-  const profile = taste?.profile;
-  return (
-    <div className="panel">
-      <p className="panel-label">口味</p>
-      <p className="taste-summary">喜欢 {profile?.likedCount || 0} 首，跳过 {profile?.skippedCount || 0} 首。画像来自当前真实歌库和播放事件。</p>
-      <div className="tags">
-        {(profile?.topTags || []).length ? profile?.topTags.map((item) => {
-          const tag = typeof item === "string" ? item : item.tag;
-          const count = typeof item === "string" ? "" : ` · ${item.count}`;
-          return <span key={tag}>{tag}{count}</span>;
-        }) : <span>暂无足够口味记录</span>}
-      </div>
-    </div>
-  );
-}
-
-function LocalLibraryPanel({ localScan }: { localScan: LocalScanResponse | null }) {
-  const stats = localScan?.stats;
-  if (!localScan) {
-    return (
-      <div className="panel">
-        <p className="panel-label">本地歌库</p>
-        <p className="empty-note">正在读取本地歌库信息。</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="panel">
-      <p className="panel-label">本地歌库</p>
-      {localScan?.configured ? (
-        <>
-          <p className="library-summary">{stats?.trackCount || 0} 首本地音频，{stats?.playableCount || 0} 首可播放。</p>
-          <div className="library-stats">
-            <span>标签识别 {stats?.taggedCount || 0}</span>
-            <span>文件名兜底 {stats?.fallbackFilenameCount || 0}</span>
-          </div>
-        </>
-      ) : (
-        <p className="empty-note">{localScan?.reason || "还没有配置 LOCAL_MUSIC_DIR。"}</p>
-      )}
-    </div>
-  );
-}
-
-function DiagnosticsPanel({ diagnostics, summary, errors }: { diagnostics: DiagnosticsResponse | null; summary?: DiagnosticsResponse["summary"]; errors: string[] }) {
-  return (
-    <section className="panel diagnostics-panel">
-      <p className="panel-label">配置诊断</p>
-      <div className="settings-summary">
-        <span>可用 {summary?.ready || 0}</span>
-        <span>回退 {summary?.fallback || 0}</span>
-        <span>缺少 {summary?.missing || 0}</span>
-        <span>{diagnostics?.secretPolicy || "不展示密钥原文"}</span>
-      </div>
-      {!diagnostics ? <p className="empty-note">正在读取配置诊断。若长时间没有结果，请检查后端是否启动。</p> : null}
-      {errors.length ? (
-        <div className="error-list" aria-label="当前错误">
-          {errors.map((error) => <p key={error}>{error}</p>)}
-        </div>
-      ) : null}
-      <div className="provider-list">
-        {(diagnostics?.providers || []).map((provider) => (
-          <article className={`provider-item ${provider.state}`} key={provider.id}>
-            <strong>{provider.label}</strong>
-            <span>{statusLabel(provider.state)}</span>
-            <p>{provider.detail || provider.reason || "已配置"}</p>
-            <small>{(provider.envVars || []).join(" / ") || "无需配置"}</small>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOUNT
+═══════════════════════════════════════════════════════════════════════════ */
 
 declare global {
   interface Window {
