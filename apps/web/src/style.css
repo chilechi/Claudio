@@ -112,7 +112,7 @@ h1 {
 
 .lower-grid {
   display: grid;
-  grid-template-columns: 1.1fr 1.2fr 0.9fr 0.8fr;
+  grid-template-columns: 1.1fr 1.2fr 1fr;
   gap: 16px;
   margin-top: 16px;
 }
@@ -370,4 +370,41 @@ h2 { min-height: 68px; margin: 8px 0; font-size: 28px; line-height: 1.2; font-we
   padding: 10px 12px;
   color: var(--text);
   background: rgba(233, 130, 109, 0.09);
+}
+
+/* 管理页面样式 */
+.admin-shell {
+  width: min(1440px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 34px 0 42px;
+}
+
+.admin-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.admin-back,
+.admin-link {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  text-decoration: none;
+}
+
+.admin-back:hover,
+.admin-link:hover {
+  color: var(--text);
+  border-color: var(--line-bright);
 }

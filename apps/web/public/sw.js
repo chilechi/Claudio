@@ -1,4 +1,4 @@
-const CACHE_VERSION = "claudio-pwa-v1";
+const CACHE_VERSION = "claudio-pwa-v2";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -30,7 +30,7 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   if (request.mode === "navigate") {
-    event.respondWith(networkFirst(request, "/"));
+    event.respondWith(networkFirst(request, "/index.html"));
     return;
   }
 

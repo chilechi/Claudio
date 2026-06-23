@@ -23,6 +23,12 @@
       "short_name": "Radio",
       "url": "/",
       "description": "Open the Claudio radio console"
+    },
+    {
+      "name": "管理配置",
+      "short_name": "Admin",
+      "url": "/admin",
+      "description": "配置诊断与歌库管理"
     }
   ]
 }
