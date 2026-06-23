@@ -15,7 +15,9 @@ export class StateService {
 
   async getState(): Promise<State> {
     const content = await readFile(this.statePath, "utf8");
-    return stateSchema.parse(JSON.parse(content.replace(/^\uFEFF/, "")));
+    const raw = JSON.parse(content.replace(/^\uFEFF/, ""));
+    if (raw.updatedAt === null) delete raw.updatedAt;
+    return stateSchema.parse(raw);
   }
 
   async saveState(state: State): Promise<State> {

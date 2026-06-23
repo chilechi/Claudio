@@ -15,10 +15,7 @@ const envSchema = z.object({
   DEEPSEEK_API_KEY: z.string().optional(),
   DEEPSEEK_BASE_URL: z.string().default("https://api.deepseek.com"),
   DEEPSEEK_MODEL: z.string().default("deepseek-chat"),
-  FISH_AUDIO_API_KEY: z.string().optional(),
-  FISH_AUDIO_BASE_URL: z.string().default("https://api.fish.audio"),
-  FISH_AUDIO_MODEL: z.string().default("s2-pro"),
-  FISH_AUDIO_VOICE_ID: z.string().optional(),
+  EDGE_TTS_VOICE: z.string().default("zh-CN-XiaoxiaoNeural"),
   LOCAL_MUSIC_DIR: z.string().optional(),
   MUSIC_SOURCE: z.enum(["auto", "local", "netease"]).default("auto"),
   NETEASE_API_BASE_URL: z.string().optional(),
@@ -89,20 +86,15 @@ function ttsStatus(env: ServerConfig): ProviderStatus {
   if (!provider) {
     return status("tts", "真实 TTS", false, "未选择 TTS_PROVIDER，当前使用浏览器语音回退", "fallback", [
       "TTS_PROVIDER",
-      "FISH_AUDIO_API_KEY",
-      "FISH_AUDIO_VOICE_ID"
+      "EDGE_TTS_VOICE"
     ]);
   }
 
-  if (provider === "fish" || provider === "fish-audio" || provider === "fishaudio") {
-    const ready = Boolean(env.FISH_AUDIO_API_KEY && env.FISH_AUDIO_VOICE_ID);
-    return status("tts", "Fish Audio TTS", ready, "Fish Audio 需要 FISH_AUDIO_API_KEY 和 FISH_AUDIO_VOICE_ID", ready ? undefined : "fallback", [
+  if (provider === "edge" || provider === "edge-tts" || provider === "edgetts") {
+    return status("tts", "Edge TTS", true, undefined, undefined, [
       "TTS_PROVIDER",
-      "FISH_AUDIO_API_KEY",
-      "FISH_AUDIO_VOICE_ID",
-      "FISH_AUDIO_MODEL",
-      "FISH_AUDIO_BASE_URL"
-    ]);
+      "EDGE_TTS_VOICE"
+    ], `语音：${env.EDGE_TTS_VOICE}`);
   }
 
   return {
@@ -127,7 +119,12 @@ function readLocalEnv() {
     if (!trimmed || trimmed.startsWith("#")) continue;
     const index = trimmed.indexOf("=");
     if (index === -1) continue;
-    result[trimmed.slice(0, index).trim()] = trimmed.slice(index + 1).trim();
+    const key = trimmed.slice(0, index).trim();
+    let value = trimmed.slice(index + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
   }
   return result;
 }

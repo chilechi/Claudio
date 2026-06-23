@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { VoiceStatus } from "../../../../../packages/shared/src/index.js";
 import { voiceStatusSchema } from "../../../../../packages/shared/dist/index.js";
 import { ConfigService } from "../config/config.service.js";
+import { synthesizeWithEdgeTts } from "./edge-tts.client.js";
 
 type SpeechAudio = {
   audio: Buffer;
@@ -24,6 +25,7 @@ export class VoiceService {
 
   status(): VoiceStatus {
     const provider = (this.config.env.TTS_PROVIDER || "").toLowerCase();
+
     if (!provider) {
       return voiceStatusSchema.parse({
         provider: "browser",
@@ -32,20 +34,18 @@ export class VoiceService {
         audioSupported: false,
         fallbackProvider: "browser",
         reason: "未配置真实 TTS，前端使用浏览器语音回退。",
-        envVars: ["TTS_PROVIDER", "FISH_AUDIO_API_KEY", "FISH_AUDIO_VOICE_ID"]
+        envVars: ["TTS_PROVIDER", "EDGE_TTS_VOICE"]
       });
     }
 
-    if (provider === "fish" || provider === "fish-audio" || provider === "fishaudio") {
-      const configured = Boolean(this.config.env.FISH_AUDIO_API_KEY && this.config.env.FISH_AUDIO_VOICE_ID);
+    if (provider === "edge" || provider === "edge-tts" || provider === "edgetts") {
       return voiceStatusSchema.parse({
-        provider: "fish-audio",
-        configured,
-        state: configured ? "ready" : "fallback",
-        audioSupported: configured,
+        provider: "edge-tts",
+        configured: true,
+        state: "ready",
+        audioSupported: true,
         fallbackProvider: "browser",
-        reason: configured ? undefined : "Fish Audio 需要 FISH_AUDIO_API_KEY 和 FISH_AUDIO_VOICE_ID。",
-        envVars: ["TTS_PROVIDER", "FISH_AUDIO_API_KEY", "FISH_AUDIO_VOICE_ID", "FISH_AUDIO_MODEL", "FISH_AUDIO_BASE_URL"]
+        envVars: ["TTS_PROVIDER", "EDGE_TTS_VOICE"]
       });
     }
 
@@ -63,11 +63,13 @@ export class VoiceService {
   async speak(text: string): Promise<SpeechAudio | null> {
     const status = this.status();
     if (!status.audioSupported) return null;
-    if (status.provider === "fish-audio") {
+
+    if (status.provider === "edge-tts") {
       const cached = this.readCachedSpeech(text, status.provider);
       if (cached) return cached;
-      return this.speakWithFishAudio(text);
+      return this.speakWithEdgeTts(text);
     }
+
     return null;
   }
 
@@ -87,8 +89,7 @@ export class VoiceService {
   private cacheFilename(text: string, provider: string) {
     const key = JSON.stringify({
       provider,
-      voice: this.config.env.FISH_AUDIO_VOICE_ID || "",
-      model: this.config.env.FISH_AUDIO_MODEL || "",
+      voice: this.config.env.EDGE_TTS_VOICE || "zh-CN-XiaoxiaoNeural",
       text
     });
     return `${createHash("sha1").update(key).digest("hex")}.mp3`;
@@ -114,32 +115,21 @@ export class VoiceService {
     return filename;
   }
 
-  private async speakWithFishAudio(text: string): Promise<SpeechAudio | null> {
-    const response = await fetch(`${this.config.env.FISH_AUDIO_BASE_URL}/v1/tts`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.config.env.FISH_AUDIO_API_KEY}`,
-        model: this.config.env.FISH_AUDIO_MODEL
-      },
-      body: JSON.stringify({
-        text,
-        reference_id: this.config.env.FISH_AUDIO_VOICE_ID,
-        format: "mp3"
-      })
-    });
-
-    if (!response.ok) return null;
-    const arrayBuffer = await response.arrayBuffer();
-    const contentType = response.headers.get("content-type") || "audio/mpeg";
-    const audio = Buffer.from(arrayBuffer);
-    const filename = this.writeCachedSpeech(text, "fish-audio", audio);
-    return {
-      audio,
-      contentType,
-      provider: "fish-audio",
-      filename,
-      cached: false
-    };
+  private async speakWithEdgeTts(text: string): Promise<SpeechAudio | null> {
+    try {
+      const audio = await synthesizeWithEdgeTts(text, {
+        voice: this.config.env.EDGE_TTS_VOICE || "zh-CN-XiaoxiaoNeural"
+      });
+      const filename = this.writeCachedSpeech(text, "edge-tts", audio);
+      return {
+        audio,
+        contentType: "audio/mpeg",
+        provider: "edge-tts",
+        filename,
+        cached: false
+      };
+    } catch {
+      return null;
+    }
   }
 }
