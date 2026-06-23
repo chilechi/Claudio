@@ -4,6 +4,8 @@ import { api } from "../lib/api";
 import type { BeforeInstallPromptEvent, HostNarrationResponse, RadioPlan, RuntimeApiResponse, RuntimeSnapshot, VoiceStatus } from "../lib/types";
 import { playbackErrorMessage, providerLabel, sourceLabel } from "../lib/utils";
 
+type ThemeName = "midnight" | "vinyl" | "blues" | "rock";
+
 type RadioContextValue = {
   // 播放状态
   library: ActiveLibrary | null;
@@ -29,8 +31,8 @@ type RadioContextValue = {
   setRadioHostEnabled: (value: boolean) => void;
   // UI 状态
   clock: string;
-  light: boolean;
-  setLight: (value: boolean | ((prev: boolean) => boolean)) => void;
+  theme: ThemeName;
+  setTheme: (value: ThemeName) => void;
   installPrompt: BeforeInstallPromptEvent | null;
   appInstalled: boolean;
   installApp: () => Promise<void>;
@@ -79,7 +81,17 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const [hostMessage, setHostMessage] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [clock, setClock] = useState("--:--");
-  const [light, setLight] = useState(false);
+  const [theme, setThemeState] = useState<ThemeName>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("claudio-theme") as ThemeName | null;
+      if (saved && ["midnight", "vinyl", "blues", "rock"].includes(saved)) return saved;
+    }
+    return "vinyl";
+  });
+  const setTheme = (value: ThemeName) => {
+    setThemeState(value);
+    if (typeof window !== "undefined") localStorage.setItem("claudio-theme", value);
+  };
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [appInstalled, setAppInstalled] = useState(false);
   const [radioHostEnabled, setRadioHostEnabled] = useState(true);
@@ -96,8 +108,10 @@ export function RadioProvider({ children }: { children: ReactNode }) {
   const currentTrack = activeQueue[currentIndex];
 
   useEffect(() => {
-    document.body.classList.toggle("light", light);
-  }, [light]);
+    const body = document.body;
+    body.classList.remove("theme-midnight", "theme-vinyl", "theme-blues", "theme-rock");
+    body.classList.add(`theme-${theme}`);
+  }, [theme]);
 
   useEffect(() => {
     playingRef.current = playing;
@@ -474,8 +488,8 @@ export function RadioProvider({ children }: { children: ReactNode }) {
     radioHostEnabled,
     setRadioHostEnabled,
     clock,
-    light,
-    setLight,
+    theme,
+    setTheme,
     installPrompt,
     appInstalled,
     installApp,
