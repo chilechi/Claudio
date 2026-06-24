@@ -134,7 +134,25 @@ export class RuntimeService implements OnModuleDestroy {
         previousTrackId: previousTrack?.id,
         input: "切歌过渡"
       });
-      await this.drainJobs();
+      this.drainJobs().catch(() => undefined);
+    }
+    return { runtime: this.snapshot(), previousTrack, currentTrack };
+  }
+
+  async previous() {
+    if (!this.queue.length) return { runtime: this.snapshot(), reason: "队列里还没有歌曲" };
+    const previousTrack = this.currentTrack();
+    this.currentIndex = (this.currentIndex - 1 + this.queue.length) % this.queue.length;
+    const currentTrack = this.currentTrack();
+    this.broadcast({ type: "control", action: "previous", track: currentTrack });
+    this.broadcast({ type: "now-playing", track: currentTrack, runtime: this.snapshot() });
+    if (currentTrack) {
+      this.enqueue("bridge_generation", {
+        trackId: currentTrack.id,
+        previousTrackId: previousTrack?.id,
+        input: "切歌过渡"
+      });
+      this.drainJobs().catch(() => undefined);
     }
     return { runtime: this.snapshot(), previousTrack, currentTrack };
   }

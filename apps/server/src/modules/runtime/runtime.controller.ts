@@ -48,6 +48,11 @@ export class RuntimeController {
     return this.runtime.next();
   }
 
+  @Post("/api/runtime/previous")
+  previous() {
+    return this.runtime.previous();
+  }
+
   @Post("/api/runtime/request")
   request(@Body() body: unknown) {
     const request = z.object({ input: z.string().trim().min(1).max(800) }).parse(body);

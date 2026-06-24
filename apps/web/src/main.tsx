@@ -685,6 +685,7 @@ function App() {
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const playingRef = useRef(false);
   const lastNarrationKeyRef = useRef("");
+  const currentTrackRef = useRef<Track | undefined>(undefined);
 
   /* ── New UI state ── */
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -702,6 +703,10 @@ function App() {
   useEffect(() => {
     playingRef.current = playing;
   }, [playing]);
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
 
   useEffect(() => {
     const update = () => {
@@ -775,7 +780,7 @@ function App() {
         audioRef.current?.pause();
         setPlaying(false);
       }
-      if (payload.action === "resume" && currentTrack?.streamUrl) {
+      if (payload.action === "resume" && currentTrackRef.current?.streamUrl) {
         audioRef.current?.play().then(() => setPlaying(true)).catch((error) => setMessage(playbackErrorMessage(error)));
       }
       if (payload.action === "volume" && typeof payload.delta === "number" && audioRef.current) {
@@ -796,7 +801,7 @@ function App() {
     };
 
     return () => events.close();
-  }, [currentTrack?.streamUrl, radioHostEnabled, voiceStatus?.audioSupported]);
+  }, [radioHostEnabled, voiceStatus?.audioSupported]);
 
   /* ── Handlers (preserved exactly) ── */
   async function boot() {
@@ -1025,7 +1030,7 @@ function App() {
     }
   }
 
-  function selectTrack(nextIndex: number, options: { continuePlayback?: boolean; eventType?: string } = {}) {
+  function selectTrack(nextIndex: number, options: { continuePlayback?: boolean; eventType?: string; skipNarration?: boolean } = {}) {
     if (!activeQueue.length) return;
     const normalizedIndex = (nextIndex + activeQueue.length) % activeQueue.length;
     const previousTrack = currentTrack;
@@ -1039,11 +1044,13 @@ function App() {
       return;
     }
     setPlaying(shouldContinue && Boolean(nextTrack.streamUrl));
-    if (nextTrack.streamUrl) requestHostNarration(previousTrack ? "between-tracks" : "intro", nextTrack, previousTrack);
+    if (nextTrack.streamUrl && !options.skipNarration) requestHostNarration(previousTrack ? "between-tracks" : "intro", nextTrack, previousTrack);
   }
 
   function move(delta: number) {
-    selectTrack(currentIndex + delta);
+    selectTrack(currentIndex + delta, { skipNarration: true });
+    const endpoint = delta > 0 ? "/api/runtime/next" : "/api/runtime/previous";
+    api<RuntimeApiResponse>(endpoint, { method: "POST" }).catch(() => undefined);
   }
 
   async function installApp() {
@@ -1137,7 +1144,7 @@ function App() {
         onPrev={() => move(-1)}
         onNext={() => move(1)}
         onLike={() => sendPlayerEvent("like")}
-        onSkip={() => { sendPlayerEvent("skip"); selectTrack(currentIndex + 1, { continuePlayback: playing }); }}
+        onSkip={() => { sendPlayerEvent("skip"); move(1); }}
         onProgress={(value) => {
           const audio = audioRef.current;
           setProgress(value);
